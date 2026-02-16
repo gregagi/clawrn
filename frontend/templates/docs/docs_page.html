@@ -27,15 +27,15 @@
 <h1>{{ page_title }}</h1>
 {{ content|safe }}
 
-<nav class="pt-8 mt-12 border-t border-gray-200 not-prose" aria-label="Docs pages navigation">
+<nav class="pt-8 mt-12 border-t border-gray-200 dark:border-gray-700 not-prose" aria-label="Docs pages navigation">
     <div class="flex gap-4 justify-between">
         <div class="flex-1">
             {% if previous_page %}
-            <a href="{{ previous_page.url }}" class="block p-4 no-underline rounded-lg border border-gray-300 transition-colors group hover:border-gray-400">
-                <div class="mb-1 text-xs font-medium text-gray-500">
+            <a href="{{ previous_page.url }}" class="block p-4 no-underline rounded-lg border border-gray-300 dark:border-gray-700 transition-colors group hover:border-gray-400 dark:hover:border-gray-500">
+                <div class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
                     ← Previous
                 </div>
-                <div class="text-base font-medium text-gray-700 group-hover:text-gray-900">
+                <div class="text-base font-medium text-gray-700 dark:text-gray-200 group-hover:text-gray-900 dark:group-hover:text-white">
                     {{ previous_page.page_title }}
                 </div>
             </a>
@@ -44,11 +44,11 @@
 
         <div class="flex-1">
             {% if next_page %}
-            <a href="{{ next_page.url }}" class="block p-4 text-right no-underline rounded-lg border border-gray-300 transition-colors group hover:border-gray-400">
-                <div class="mb-1 text-xs font-medium text-gray-500">
+            <a href="{{ next_page.url }}" class="block p-4 text-right no-underline rounded-lg border border-gray-300 dark:border-gray-700 transition-colors group hover:border-gray-400 dark:hover:border-gray-500">
+                <div class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
                     Next →
                 </div>
-                <div class="text-base font-medium text-gray-700 group-hover:text-gray-900">
+                <div class="text-base font-medium text-gray-700 dark:text-gray-200 group-hover:text-gray-900 dark:group-hover:text-white">
                     {{ next_page.page_title }}
                 </div>
             </a>

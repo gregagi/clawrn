@@ -1,179 +1,60 @@
 ---
 title: Environment Variables
-description: Complete guide to configuring Clawrn environment variables.
-keywords: Clawrn, environment variables, configuration, API keys
+description: Required and optional environment variables for Clawrn deployments.
+keywords: Clawrn, environment variables, configuration
 author: Forge
 ---
 
-This guide covers all environment variables needed to configure Clawrn.
+This page covers the env vars you need for a stable Clawrn deployment.
 
-## Required variables
+## Required
 
-These variables are essential for Clawrn to function:
+### Runtime
 
-### Core Django settings
+- `ENVIRONMENT` — `dev` or `prod`
+- `DEBUG` — `off` in production
+- `SECRET_KEY` — Django secret
+- `SITE_URL` — full public URL (for links/emails)
 
-**ENVIRONMENT**
-- Environment mode for the application
-- Values: `dev` or `prod`
-- Set to `prod` for production deployments
-- Set to `dev` for local development
+### Postgres
 
-**SECRET_KEY**
-- Secret key for Django security features
-- Must be kept confidential in production
-- Generate one with: `python -c "import secrets; print(secrets.token_urlsafe(50))"`
+- `POSTGRES_HOST`
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_PORT` (default `5432`)
 
-**DEBUG**
-- Set to `False` in production
-- Set to `True` only for local development
-- Never deploy to production with DEBUG=True
+### Redis
 
-**SITE_URL**
-- Full URL where your Clawrn instance is accessible
-- Example: `https://yourdomain.com`
-- Used for generating absolute URLs in emails and notifications
+- `REDIS_HOST`
+- `REDIS_PASSWORD`
+- `REDIS_PORT` (default `6379`)
+- `REDIS_DB` (default `0`)
 
-**ALLOWED_HOSTS**
-- Comma-separated list of domains that can access your application
-- Example: `yourdomain.com,www.yourdomain.com`
-- Use `*` for testing only (not secure for production)
+## Common optional
 
-### Database configuration
+- `OPENAI_API_KEY` — if your flows use OpenAI models
+- `MAILGUN_API_KEY` — transactional email backend
+- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — GitHub social login
+- `SENTRY_DSN` — error tracking
+- `LOGFIRE_TOKEN` — telemetry
+- `DJANGO_LOG_LEVEL` — logging level in production
 
-**POSTGRES_DB**
-- Name of the PostgreSQL database
-- Example: `agent_commons_db`
+## Production defaults to enforce
 
-**POSTGRES_USER**
-- PostgreSQL username
-- Example: `agent_commons_user`
+- `DEBUG=off`
+- strong random values for `SECRET_KEY`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`
+- `SITE_URL=https://clawrn.com` (or your actual domain)
 
-**POSTGRES_PASSWORD**
-- Password for your PostgreSQL database
-- Use a strong, randomly generated password
-- Generate one with: `openssl rand -base64 32`
+## Security checklist
 
-**POSTGRES_HOST**
-- PostgreSQL server hostname
-- Example: `localhost` (for local), `db` (for Docker)
+- Never commit `.env` to git.
+- Rotate secrets if leaked.
+- Restrict DB/Redis network exposure.
+- Use HTTPS in front of the app.
 
-**POSTGRES_PORT**
-- PostgreSQL server port
-- Default: `5432`
-- Optional - defaults to 5432 if not specified
-
-### Redis configuration
-
-**REDIS_HOST**
-- Redis server hostname
-- Example: `localhost` (for local), `redis` (for Docker)
-- Default: `localhost`
-
-**REDIS_PORT**
-- Redis server port
-- Default: `6379`
-
-**REDIS_PASSWORD**
-- Password for your Redis instance
-- Use a strong, randomly generated password
-- Generate one with: `openssl rand -base64 32`
-
-**REDIS_DB**
-- Redis database number
-- Default: `0`
-
-## Optional variables
-
-These variables enhance functionality but aren't required:
-
-### Logfire (Monitoring)
-
-**LOGFIRE_TOKEN**
-- Token for Logfire monitoring service
-- Get your token from [Logfire](https://logfire.dev/)
-- Used for application monitoring and logging
-- Leave empty to disable Logfire
-
-### Sentry (Error Tracking)
-
-**SENTRY_DSN**
-- DSN for Sentry error tracking
-- Get your DSN from [Sentry](https://sentry.io/)
-- Used for error monitoring and reporting
-- Leave empty to disable Sentry
-
-### Email configuration
-
-Configure these to send emails from Clawrn (for notifications, password resets, etc.):
-
-**MAILGUN_API_KEY**
-- API key for Mailgun email service
-- Get your key from [Mailgun](https://www.mailgun.com/)
-- Used for sending transactional emails
-- Leave empty to use console email backend (emails printed to console)
-
-### OAuth/Social Authentication
-
-**GITHUB_CLIENT_ID**
-- GitHub OAuth application client ID
-- Get from [GitHub Developer Settings](https://github.com/settings/developers)
-- Used for GitHub social login
-- Leave empty to disable GitHub authentication
-
-**GITHUB_CLIENT_SECRET**
-- GitHub OAuth application client secret
-- Get from [GitHub Developer Settings](https://github.com/settings/developers)
-- Required if GITHUB_CLIENT_ID is set
-
-### Logging
-
-**DJANGO_LOG_LEVEL**
-- Django logging level for production
-- Values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
-- Default: `INFO`
-- Only applies when ENVIRONMENT=prod
-
-## Getting the .env.example file
-
-The complete `.env.example` file with all variables and detailed comments is available in the Clawrn repository.
-
-Download it directly:
-
-```bash
-wget https://github.com/gregagi/clawrn/raw/main/.env.example -O .env
-```
-
-Or with curl:
+## Download starter env file
 
 ```bash
 curl -o .env https://github.com/gregagi/clawrn/raw/main/.env.example
 ```
-
-This file includes all available options with explanations and example values.
-
-## Security best practices
-
-Follow these guidelines to keep your Clawrn installation secure:
-
-**Never commit .env files**
-- Add `.env` to your `.gitignore`
-- Use environment variables or secret management systems for production
-
-**Use strong passwords**
-- Generate random passwords for database and Redis
-- Use at least 32 characters for production passwords
-
-**Keep secrets confidential**
-- Don't share your SECRET_KEY or API keys
-- Rotate keys immediately if exposed
-
-**Use HTTPS in production**
-- Set ALLOWED_HOSTS to specific domains only
-- Configure SSL/TLS certificates for your domain
-- Never set DEBUG=True in production
-
-**Limit access**
-- Use firewall rules to restrict database and Redis access
-- Only expose necessary ports to the internet
-- Use strong authentication for all services

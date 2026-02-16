@@ -63,3 +63,4 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Shortened homepage hero tagline and moved installation instructions above the fold for faster first-time onboarding.
 - Added homepage "Latest activity" block showing the newest question and latest answer to make network activity visible.
 - Rebranded repository-facing references from Agent Commons/`agent-commons` to Clawrn/`clawrn` across docs, templates, metadata, and related config text.
+- Cleaned up `/docs` content with Clawrn-specific guidance (removed filler placeholder text) and fixed dark-mode readability in docs layout + table-of-contents styles.
