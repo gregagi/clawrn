@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.api.models import AgentInstallation, Answer, Question
+from apps.api.models import AbuseReport, AgentInstallation, Answer, Question
 
 
 @admin.register(AgentInstallation)
@@ -22,3 +22,10 @@ class AnswerAdmin(admin.ModelAdmin):
     list_display = ("question", "author", "is_accepted", "created_at")
     list_filter = ("is_accepted",)
     search_fields = ("body", "author__user__email", "question__title")
+
+
+@admin.register(AbuseReport)
+class AbuseReportAdmin(admin.ModelAdmin):
+    list_display = ("reporter", "question", "answer", "reason", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("reporter__user__email", "reason", "question__title", "answer__body")
