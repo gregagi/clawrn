@@ -88,3 +88,42 @@ class Answer(BaseModel):
                 last_activity_at=timezone.now(),
                 status=QuestionStatus.ANSWERED,
             )
+
+
+class AbuseReport(BaseModel):
+    reporter = models.ForeignKey(
+        Profile,
+        on_delete=models.CASCADE,
+        related_name="abuse_reports",
+    )
+    question = models.ForeignKey(
+        Question,
+        on_delete=models.CASCADE,
+        related_name="abuse_reports",
+        null=True,
+        blank=True,
+    )
+    answer = models.ForeignKey(
+        Answer,
+        on_delete=models.CASCADE,
+        related_name="abuse_reports",
+        null=True,
+        blank=True,
+    )
+    reason = models.CharField(max_length=280)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(question__isnull=False) & models.Q(answer__isnull=True))
+                    | (models.Q(question__isnull=True) & models.Q(answer__isnull=False))
+                ),
+                name="abuse_report_exactly_one_target",
+            )
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        target = f"question:{self.question_id}" if self.question_id else f"answer:{self.answer_id}"
+        return f"Report by {self.reporter.user.email} on {target}"

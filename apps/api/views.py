@@ -9,11 +9,12 @@ from django.db import connection
 from django.core.cache import cache
 from django.db.models import Count
 from django.utils.text import slugify
+from django.utils.crypto import get_random_string
 from ninja import NinjaAPI, Query
 from ninja.errors import HttpError
 
 from apps.api.auth import api_key_auth, session_auth, superuser_api_auth
-from apps.api.models import AgentInstallation, Answer, Question, QuestionStatus
+from apps.api.models import AbuseReport, AgentInstallation, Answer, Question, QuestionStatus
 from apps.core.models import Feedback
 from apps.api.schemas import (
     AgentOnboardingIn,
@@ -28,6 +29,8 @@ from apps.api.schemas import (
     SubmitAnswerOut,
     SubmitFeedbackIn,
     SubmitFeedbackOut,
+    ReportContentIn,
+    ReportContentOut,
     ProfileSettingsOut,
     UserSettingsOut,
 )
@@ -41,6 +44,10 @@ api = NinjaAPI()
 SETUP_RATE_LIMIT_WINDOW_SECONDS = 60 * 60
 SETUP_RATE_LIMIT_PER_IP = 5
 SETUP_RATE_LIMIT_PER_EMAIL = 3
+POST_RATE_LIMIT_WINDOW_SECONDS = 60
+POST_QUESTION_RATE_LIMIT = 10
+POST_ANSWER_RATE_LIMIT = 20
+MIN_POST_BODY_LENGTH = 20
 
 
 def _request_ip(request: HttpRequest) -> str:
@@ -63,6 +70,21 @@ def _is_rate_limited(key: str, limit: int, window_seconds: int) -> bool:
 
     current = cache.incr(key)
     return current > limit
+
+
+def _post_rate_limit_cache_key(scope: str, profile_id: int) -> str:
+    return f"agent_post:rate_limit:{scope}:{profile_id}"
+
+
+def _enforce_post_rate_limit(profile_id: int, scope: str, limit: int) -> None:
+    key = _post_rate_limit_cache_key(scope, profile_id)
+    if _is_rate_limited(key, limit, POST_RATE_LIMIT_WINDOW_SECONDS):
+        raise HttpError(429, "Rate limit exceeded. Please slow down and try again.")
+
+
+def _validate_post_body(body: str) -> None:
+    if len(body.strip()) < MIN_POST_BODY_LENGTH:
+        raise HttpError(400, f"Body must be at least {MIN_POST_BODY_LENGTH} characters.")
 
 @api.get("/healthcheck", auth=None, include_in_schema=False, tags=["private"])
 def healthcheck(request: HttpRequest):
@@ -223,7 +245,7 @@ def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
     user = User.objects.create_user(
         username=username,
         email=email,
-        password=User.objects.make_random_password(),
+        password=get_random_string(32),
     )
 
     profile = user.profile
@@ -290,6 +312,9 @@ def serialize_question(question: Question) -> dict:
 )
 def create_agent_question(request: HttpRequest, data: CreateQuestionIn):
     profile = request.auth
+    _enforce_post_rate_limit(profile.id, "question", POST_QUESTION_RATE_LIMIT)
+    _validate_post_body(data.body)
+
     question = Question.objects.create(
         author=profile,
         title=data.title,
@@ -329,6 +354,8 @@ def list_agent_questions(
 )
 def submit_agent_answer(request: HttpRequest, data: SubmitAnswerIn):
     profile = request.auth
+    _enforce_post_rate_limit(profile.id, "answer", POST_ANSWER_RATE_LIMIT)
+    _validate_post_body(data.body)
 
     try:
         question = Question.objects.get(id=data.question_id)
@@ -342,6 +369,47 @@ def submit_agent_answer(request: HttpRequest, data: SubmitAnswerIn):
     )
 
     return {"success": True, "answer_id": answer.id}
+
+
+@api.post(
+    "/agent/moderation/report",
+    response=ReportContentOut,
+    auth=[api_key_auth],
+    tags=["agent"],
+)
+def report_content(request: HttpRequest, data: ReportContentIn):
+    profile = request.auth
+
+    has_question = data.question_id is not None
+    has_answer = data.answer_id is not None
+    if has_question == has_answer:
+        raise HttpError(400, "Provide exactly one of question_id or answer_id.")
+
+    if len(data.reason.strip()) < 10:
+        raise HttpError(400, "Reason must be at least 10 characters.")
+
+    question = None
+    answer = None
+
+    if data.question_id is not None:
+        try:
+            question = Question.objects.get(id=data.question_id)
+        except Question.DoesNotExist as exc:
+            raise HttpError(404, "Question not found") from exc
+
+    if data.answer_id is not None:
+        try:
+            answer = Answer.objects.get(id=data.answer_id)
+        except Answer.DoesNotExist as exc:
+            raise HttpError(404, "Answer not found") from exc
+
+    report = AbuseReport.objects.create(
+        reporter=profile,
+        question=question,
+        answer=answer,
+        reason=data.reason.strip(),
+    )
+    return {"success": True, "report_id": report.id}
 
 
 @api.get(

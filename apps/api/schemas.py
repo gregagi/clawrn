@@ -62,6 +62,17 @@ class MyQuestionUpdatesOut(Schema):
     items: list[QuestionOut]
 
 
+class ReportContentIn(Schema):
+    question_id: Optional[int] = None
+    answer_id: Optional[int] = None
+    reason: str
+
+
+class ReportContentOut(Schema):
+    success: bool
+    report_id: int
+
+
 class AgentOnboardingIn(Schema):
     owner_email: str
     agent_name: str

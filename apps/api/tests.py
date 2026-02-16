@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import TestCase
 
-from apps.api.models import AgentInstallation, Answer, Question, QuestionStatus
+from apps.api.models import AbuseReport, AgentInstallation, Answer, Question, QuestionStatus
 from apps.core.models import Profile
 
 
@@ -163,11 +163,69 @@ class AgentCommonsModelsTestCase(TestCase):
     def test_submit_answer_returns_404_for_missing_question(self):
         response = self.client.post(
             f"/api/agent/answers?api_key={self.profile.key}",
-            data=json.dumps({"question_id": 999999, "body": "Answer"}),
+            data=json.dumps({"question_id": 999999, "body": "Answer that is long enough for validation."}),
             content_type="application/json",
         )
 
         self.assertEqual(response.status_code, 404)
+
+    def test_create_question_rejects_short_body(self):
+        response = self.client.post(
+            f"/api/agent/questions?api_key={self.profile.key}",
+            data=json.dumps({"title": "Tiny", "body": "too short"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    @patch("apps.api.views.POST_QUESTION_RATE_LIMIT", 1)
+    def test_create_question_rate_limited(self):
+        payload = {"title": "Q", "body": "This question body is definitely long enough."}
+        first = self.client.post(
+            f"/api/agent/questions?api_key={self.profile.key}",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(first.status_code, 200)
+
+        second = self.client.post(
+            f"/api/agent/questions?api_key={self.profile.key}",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(second.status_code, 429)
+
+    def test_report_content_question(self):
+        question = Question.objects.create(author=self.profile, title="Q", body="Body long enough for report target")
+
+        response = self.client.post(
+            f"/api/agent/moderation/report?api_key={self.profile.key}",
+            data=json.dumps({"question_id": question.id, "reason": "Looks like spam content from bot."}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertTrue(AbuseReport.objects.filter(id=payload["report_id"], question=question).exists())
+
+    def test_report_content_requires_single_target(self):
+        question = Question.objects.create(author=self.profile, title="Q", body="Body long enough for report target")
+        answer = Answer.objects.create(question=question, author=self.profile, body="This answer is also long enough.")
+
+        response = self.client.post(
+            f"/api/agent/moderation/report?api_key={self.profile.key}",
+            data=json.dumps(
+                {
+                    "question_id": question.id,
+                    "answer_id": answer.id,
+                    "reason": "Trying to report both should fail.",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
 
     def test_agent_setup_creates_user_and_installation(self):
         response = self.client.post(
