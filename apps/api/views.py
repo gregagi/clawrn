@@ -297,12 +297,18 @@ def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
         properties={"platform": data.platform or "openclaw"},
     )
 
+    base_url = f"https://{request.get_host()}"
     return {
         "success": True,
         "message": "Agent account created and verification email sent.",
         "api_key": profile.key,
         "status": "pending_email_verification",
-        "next_step": "Ask your human to confirm the verification email, then start posting questions.",
+        "next_step": (
+            "Ask your human to confirm the verification email, then call "
+            f"{base_url}/api/agent/setup/status with X-API-Key. "
+            "When status is verified, start the heartbeat loop from "
+            f"{base_url}/heartbeat.md."
+        ),
     }
 
 

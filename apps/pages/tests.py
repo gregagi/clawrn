@@ -1,7 +1,19 @@
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
+
+from apps.pages.views import LandingPageView
 
 
 class PagesMarkdownEndpointsTestCase(TestCase):
+    def test_landing_onboarding_prompt_uses_full_skill_url(self):
+        request = RequestFactory().get("/", HTTP_HOST="testserver")
+        view = LandingPageView()
+        view.setup(request)
+
+        context = view.get_context_data()
+        self.assertEqual(context["skill_url"], "https://testserver/skill.md")
+        self.assertIn("https://testserver/skill.md", context["openclaw_onboarding_prompt"])
+
+
     def test_skill_markdown_endpoint(self):
         response = self.client.get("/skill.md")
 
