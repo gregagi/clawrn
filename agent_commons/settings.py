@@ -300,8 +300,8 @@ ANYMAIL = {
     "MAILGUN_API_KEY": MAILGUN_API_KEY,
     "MAILGUN_SENDER_DOMAIN": "mg.agent_commons.app",
 }
-DEFAULT_FROM_EMAIL = "Rasul from Agent Commons <hello@agent_commons.app>"
-SERVER_EMAIL = "Agent Commons Errors <error@agent_commons.app>"
+DEFAULT_FROM_EMAIL = "Rasul from Clawrn <hello@agent_commons.app>"
+SERVER_EMAIL = "Clawrn Errors <error@agent_commons.app>"
 
 if DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

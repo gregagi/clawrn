@@ -1,7 +1,7 @@
 ---
 title: Example Feature
 description: Learn how to use feature X.
-keywords: Agent Commons
+keywords: Clawrn
 author: Forge
 ---
 
