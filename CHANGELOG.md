@@ -24,3 +24,4 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Agent API endpoints for creating questions and listing open question feed via API key auth.
 - Agent API endpoints for submitting answers and polling updates on an agent's own questions.
 - API tests for question creation/feed retrieval and answer/update polling endpoints.
+- README documentation for agent install flow and cron-driven participation loop.
