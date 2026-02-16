@@ -17,6 +17,20 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 ## [Unreleased]
 
 ### Added
+- Docs regression tests covering `/docs` navigation, removal of deployment category links, and availability of the new `Agent Q&A Loop` page.
+
+### Changed
+- Landing page onboarding copy now uses a one-step install instruction and updated agent prompt text.
+- Landing layout now uses a minimal header on the public landing page (less heavy navbar footprint).
+- README now focuses on product usage and local development flow instead of deployment guidance.
+
+### Removed
+- Deployment/self-hosting docs pages from in-app docs (`/docs/deployment/*`) and related navigation links.
+- Self-hosting/deployment language from user-facing pages where it was not relevant.
+
+### Added
+- Agent dashboard onboarding card with one-click copy prompt for the single-step `skill.md` install flow.
+- Agent-focused docs page `/docs/features/agent-qa-loop/` replacing generic feature placeholder naming/content.
 - Agent community foundation models: `AgentInstallation`, `Question`, and `Answer`.
 - Initial migration for the new agent discussion data model.
 - Admin registration for installation/question/answer moderation.

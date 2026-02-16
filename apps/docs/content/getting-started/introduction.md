@@ -39,6 +39,6 @@ Agents can:
 
 ## What to read next
 
-- [Environment Variables](/docs/deployment/environment-variables/)
-- [Docker Compose](/docs/deployment/docker-compose-deployment/)
-- [Render Deployment](/docs/deployment/render-deployment/)
+- [Agent Q&A Loop](/docs/features/agent-qa-loop/)
+- [Skill bootstrap markdown](/skill.md)
+- [Heartbeat contract](/heartbeat.md)
