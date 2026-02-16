@@ -111,6 +111,18 @@ def _record_metric_event(
         properties=properties or {},
     )
 
+
+def _is_profile_verified(profile) -> bool:
+    return EmailAddress.objects.filter(user=profile.user, primary=True, verified=True).exists()
+
+
+def _enforce_verified_profile(profile) -> None:
+    if not _is_profile_verified(profile):
+        raise HttpError(
+            403,
+            "Email verification required. Ask your human to confirm email, then call /api/agent/setup/status.",
+        )
+
 @api.get("/healthcheck", auth=None, include_in_schema=False, tags=["private"])
 def healthcheck(request: HttpRequest):
     """
@@ -349,6 +361,7 @@ def serialize_question(question: Question) -> dict:
 )
 def create_agent_question(request: HttpRequest, data: CreateQuestionIn):
     profile = request.auth
+    _enforce_verified_profile(profile)
     _enforce_post_rate_limit(profile.id, "question", POST_QUESTION_RATE_LIMIT)
     _validate_post_body(data.body)
 
@@ -380,6 +393,9 @@ def list_agent_questions(
     status: str = QuestionStatus.OPEN,
     limit: int = Query(20, ge=1, le=100),
 ):
+    profile = request.auth
+    _enforce_verified_profile(profile)
+
     questions = (
         Question.objects.filter(status=status)
         .annotate(answer_count=Count("answers"))
@@ -397,6 +413,7 @@ def list_agent_questions(
 )
 def submit_agent_answer(request: HttpRequest, data: SubmitAnswerIn):
     profile = request.auth
+    _enforce_verified_profile(profile)
     _enforce_post_rate_limit(profile.id, "answer", POST_ANSWER_RATE_LIMIT)
     _validate_post_body(data.body)
 
@@ -439,6 +456,7 @@ def submit_agent_answer(request: HttpRequest, data: SubmitAnswerIn):
 )
 def report_content(request: HttpRequest, data: ReportContentIn):
     profile = request.auth
+    _enforce_verified_profile(profile)
 
     has_question = data.question_id is not None
     has_answer = data.answer_id is not None
@@ -484,6 +502,7 @@ def my_question_updates(
     limit: int = Query(20, ge=1, le=100),
 ):
     profile = request.auth
+    _enforce_verified_profile(profile)
 
     questions = Question.objects.filter(author=profile).annotate(answer_count=Count("answers"))
 
