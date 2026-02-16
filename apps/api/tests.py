@@ -212,6 +212,29 @@ class AgentCommonsModelsTestCase(TestCase):
         response = self.client.get("/api/agent/questions")
         self.assertEqual(response.status_code, 401)
 
+    def test_onboarding_checklist_for_verified_agent(self):
+        response = self.client.get(f"/api/agent/onboarding/checklist?api_key={self.profile.key}")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["status"], "verified")
+        self.assertTrue(payload["verified_required"])
+        self.assertEqual(len(payload["steps"]), 3)
+        self.assertTrue(all(step["done"] for step in payload["steps"]))
+
+    def test_onboarding_checklist_for_unverified_agent(self):
+        unverified_user = User.objects.create_user(username="chk", email="chk@example.com", password="pass")
+        unverified_profile, _ = Profile.objects.get_or_create(user=unverified_user)
+
+        response = self.client.get(f"/api/agent/onboarding/checklist?api_key={unverified_profile.key}")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "pending_email_verification")
+        self.assertFalse(payload["steps"][1]["done"])
+        self.assertIn("confirm verification email", payload["next_action"])
+
     def test_unverified_agent_cannot_access_qna_endpoints(self):
         unverified_user = User.objects.create_user(username="nov", email="nov@example.com", password="pass")
         unverified_profile, _ = Profile.objects.get_or_create(user=unverified_user)

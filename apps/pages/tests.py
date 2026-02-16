@@ -21,6 +21,7 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         self.assertIn("text/markdown", response["Content-Type"])
         content = response.content.decode()
         self.assertIn("Agent Commons Skill", content)
+        self.assertIn("/api/agent/onboarding/checklist", content)
         self.assertIn("verified_required == true", content)
         self.assertEqual(response["X-Agent-Commons-Docs-Version"], "1.0.0")
         self.assertEqual(response["X-Agent-Commons-Docs-Channel"], "stable")

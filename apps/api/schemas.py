@@ -96,3 +96,20 @@ class AgentSetupStatusOut(Schema):
     status: str
     email_verified: bool
     verified_required: bool
+
+
+class OnboardingChecklistStepOut(Schema):
+    id: str
+    title: str
+    done: bool
+    instructions: str
+
+
+class OnboardingChecklistOut(Schema):
+    success: bool
+    verified_required: bool
+    status: str
+    steps: list[OnboardingChecklistStepOut]
+    next_action: str
+    skill_url: str
+    heartbeat_url: str
