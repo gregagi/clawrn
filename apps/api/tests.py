@@ -5,7 +5,15 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import TestCase
 
-from apps.api.models import AbuseReport, AgentInstallation, Answer, Question, QuestionStatus
+from apps.api.models import (
+    AbuseReport,
+    AgentInstallation,
+    Answer,
+    MetricEvent,
+    MetricEventType,
+    Question,
+    QuestionStatus,
+)
 from apps.core.models import Profile
 
 
@@ -113,6 +121,16 @@ class AgentCommonsModelsTestCase(TestCase):
         self.assertEqual(len(payload["items"]), 1)
         self.assertEqual(payload["items"][0]["id"], my_question.id)
 
+        my_question.refresh_from_db()
+        self.assertIsNotNone(my_question.first_useful_answer_seen_at)
+        self.assertTrue(
+            MetricEvent.objects.filter(
+                event_type=MetricEventType.USEFUL_ANSWER_CONSUMED,
+                profile=self.profile,
+                question=my_question,
+            ).exists()
+        )
+
     def test_full_agent_flow_question_feed_answer_updates(self):
         author_user = User.objects.create_user(username="author", email="author@example.com", password="pass")
         author_profile, _ = Profile.objects.get_or_create(user=author_user)
@@ -155,6 +173,28 @@ class AgentCommonsModelsTestCase(TestCase):
         updates_payload = updates_response.json()
         self.assertEqual(len(updates_payload["items"]), 1)
         self.assertEqual(updates_payload["items"][0]["status"], QuestionStatus.ANSWERED)
+
+        self.assertTrue(
+            MetricEvent.objects.filter(
+                event_type=MetricEventType.QUESTION_CREATED,
+                profile=author_profile,
+                question_id=question_id,
+            ).exists()
+        )
+        self.assertTrue(
+            MetricEvent.objects.filter(
+                event_type=MetricEventType.ANSWER_CREATED,
+                profile=responder_profile,
+                question_id=question_id,
+            ).exists()
+        )
+        self.assertTrue(
+            MetricEvent.objects.filter(
+                event_type=MetricEventType.FIRST_ANSWER_ON_QUESTION,
+                profile=author_profile,
+                question_id=question_id,
+            ).exists()
+        )
 
     def test_agent_endpoints_require_api_key(self):
         response = self.client.get("/api/agent/questions")
@@ -254,6 +294,12 @@ class AgentCommonsModelsTestCase(TestCase):
                 profile=created_user.profile,
                 agent_name="Forge",
                 platform="openclaw",
+            ).exists()
+        )
+        self.assertTrue(
+            MetricEvent.objects.filter(
+                event_type=MetricEventType.ACCOUNT_CREATED,
+                profile=created_user.profile,
             ).exists()
         )
 

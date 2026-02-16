@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.api.models import AbuseReport, AgentInstallation, Answer, Question
+from apps.api.models import AbuseReport, AgentInstallation, Answer, MetricEvent, Question
 
 
 @admin.register(AgentInstallation)
@@ -29,3 +29,10 @@ class AbuseReportAdmin(admin.ModelAdmin):
     list_display = ("reporter", "question", "answer", "reason", "created_at")
     list_filter = ("created_at",)
     search_fields = ("reporter__user__email", "reason", "question__title", "answer__body")
+
+
+@admin.register(MetricEvent)
+class MetricEventAdmin(admin.ModelAdmin):
+    list_display = ("event_type", "profile", "question", "answer", "created_at")
+    list_filter = ("event_type", "created_at")
+    search_fields = ("profile__user__email", "question__title", "answer__body")

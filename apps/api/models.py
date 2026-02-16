@@ -48,6 +48,7 @@ class Question(BaseModel):
         default=QuestionStatus.OPEN,
     )
     last_activity_at = models.DateTimeField(default=timezone.now)
+    first_useful_answer_seen_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-last_activity_at", "-created_at"]
@@ -127,3 +128,47 @@ class AbuseReport(BaseModel):
     def __str__(self):
         target = f"question:{self.question_id}" if self.question_id else f"answer:{self.answer_id}"
         return f"Report by {self.reporter.user.email} on {target}"
+
+
+class MetricEventType(models.TextChoices):
+    ACCOUNT_CREATED = "account_created", "Account Created"
+    QUESTION_CREATED = "question_created", "Question Created"
+    ANSWER_CREATED = "answer_created", "Answer Created"
+    FIRST_ANSWER_ON_QUESTION = "first_answer_on_question", "First Answer On Question"
+    USEFUL_ANSWER_CONSUMED = "useful_answer_consumed", "Useful Answer Consumed"
+
+
+class MetricEvent(BaseModel):
+    event_type = models.CharField(max_length=64, choices=MetricEventType.choices)
+    profile = models.ForeignKey(
+        Profile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="metric_events",
+    )
+    question = models.ForeignKey(
+        Question,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="metric_events",
+    )
+    answer = models.ForeignKey(
+        Answer,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="metric_events",
+    )
+    properties = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["event_type", "-created_at"]),
+            models.Index(fields=["profile", "-created_at"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.event_type} @ {self.created_at.isoformat()}"

@@ -10,11 +10,20 @@ from django.core.cache import cache
 from django.db.models import Count
 from django.utils.text import slugify
 from django.utils.crypto import get_random_string
+from django.utils import timezone
 from ninja import NinjaAPI, Query
 from ninja.errors import HttpError
 
 from apps.api.auth import api_key_auth, session_auth, superuser_api_auth
-from apps.api.models import AbuseReport, AgentInstallation, Answer, Question, QuestionStatus
+from apps.api.models import (
+    AbuseReport,
+    AgentInstallation,
+    Answer,
+    MetricEvent,
+    MetricEventType,
+    Question,
+    QuestionStatus,
+)
 from apps.core.models import Feedback
 from apps.api.schemas import (
     AgentOnboardingIn,
@@ -85,6 +94,22 @@ def _enforce_post_rate_limit(profile_id: int, scope: str, limit: int) -> None:
 def _validate_post_body(body: str) -> None:
     if len(body.strip()) < MIN_POST_BODY_LENGTH:
         raise HttpError(400, f"Body must be at least {MIN_POST_BODY_LENGTH} characters.")
+
+
+def _record_metric_event(
+    event_type: str,
+    profile=None,
+    question=None,
+    answer=None,
+    properties: dict | None = None,
+) -> None:
+    MetricEvent.objects.create(
+        event_type=event_type,
+        profile=profile,
+        question=question,
+        answer=answer,
+        properties=properties or {},
+    )
 
 @api.get("/healthcheck", auth=None, include_in_schema=False, tags=["private"])
 def healthcheck(request: HttpRequest):
@@ -266,6 +291,12 @@ def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
     email_confirmation = EmailConfirmation.create(email_address)
     email_confirmation.send(request, signup=True)
 
+    _record_metric_event(
+        MetricEventType.ACCOUNT_CREATED,
+        profile=profile,
+        properties={"platform": data.platform or "openclaw"},
+    )
+
     return {
         "success": True,
         "message": "Agent account created and verification email sent.",
@@ -323,6 +354,12 @@ def create_agent_question(request: HttpRequest, data: CreateQuestionIn):
     )
 
     question.answer_count = 0
+    _record_metric_event(
+        MetricEventType.QUESTION_CREATED,
+        profile=profile,
+        question=question,
+        properties={"tags_count": len(question.tags or [])},
+    )
     return {"success": True, "question": serialize_question(question)}
 
 
@@ -362,11 +399,28 @@ def submit_agent_answer(request: HttpRequest, data: SubmitAnswerIn):
     except Question.DoesNotExist as exc:
         raise HttpError(404, "Question not found") from exc
 
+    had_answers = question.answers.exists()
+
     answer = Answer.objects.create(
         question=question,
         author=profile,
         body=data.body,
     )
+
+    _record_metric_event(
+        MetricEventType.ANSWER_CREATED,
+        profile=profile,
+        question=question,
+        answer=answer,
+    )
+
+    if not had_answers:
+        _record_metric_event(
+            MetricEventType.FIRST_ANSWER_ON_QUESTION,
+            profile=question.author,
+            question=question,
+            answer=answer,
+        )
 
     return {"success": True, "answer_id": answer.id}
 
@@ -430,7 +484,21 @@ def my_question_updates(
     if since:
         questions = questions.filter(last_activity_at__gt=since)
 
-    questions = questions.order_by("-last_activity_at")[:limit]
+    questions = list(questions.order_by("-last_activity_at")[:limit])
     questions = [question for question in questions if question.answer_count > 0]
+
+    now = timezone.now()
+    for question in questions:
+        if question.first_useful_answer_seen_at is None:
+            Question.objects.filter(pk=question.pk, first_useful_answer_seen_at__isnull=True).update(
+                first_useful_answer_seen_at=now
+            )
+            question.first_useful_answer_seen_at = now
+            _record_metric_event(
+                MetricEventType.USEFUL_ANSWER_CONSUMED,
+                profile=profile,
+                question=question,
+                properties={"answer_count": question.answer_count},
+            )
 
     return {"items": [serialize_question(question) for question in questions]}
