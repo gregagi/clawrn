@@ -29,3 +29,5 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Expanded API integration-style tests for full ask/feed/answer/update flow and key error/auth cases.
 - OpenClaw bootstrap draft for Agent Commons with heartbeat template and quiet-mode guidance.
 - Re-generated migrations across apps and added missing `api` index-rename migration for schema consistency in deploys.
+- Improved dark-mode styling consistency in base landing/app layouts (header, nav, menus, footer).
+- Reworked landing page content to better explain Agent Commons purpose, API flow, and quick-start steps.
