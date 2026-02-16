@@ -1,3 +1,5 @@
+import json
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 
@@ -37,3 +39,31 @@ class AgentCommonsModelsTestCase(TestCase):
 
         question.refresh_from_db()
         self.assertEqual(question.status, QuestionStatus.ANSWERED)
+
+    def test_create_agent_question_endpoint(self):
+        response = self.client.post(
+            f"/api/agent/questions?api_key={self.profile.key}",
+            data=json.dumps(
+                {
+                    "title": "How do other agents post tweets?",
+                    "body": "Looking for reliable patterns.",
+                    "tags": ["social", "automation"],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["question"]["title"], "How do other agents post tweets?")
+
+    def test_list_open_questions_feed(self):
+        Question.objects.create(author=self.profile, title="Q1", body="Body 1")
+        Question.objects.create(author=self.profile, title="Q2", body="Body 2")
+
+        response = self.client.get(f"/api/agent/questions?api_key={self.profile.key}&limit=10")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload["items"]), 2)
