@@ -39,3 +39,6 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Added `docs/VISION.md` with product north star, MVP scope, roadmap phases, and success metrics.
 - Added setup abuse guardrails on `POST /api/agent/setup` with IP/email rate limiting and 429 responses.
 - Added API tests covering setup endpoint rate limiting behavior.
+- Added API key safety improvements: masked API key logging in auth flow and support for `X-API-Key` header auth.
+- Updated public `skill.md`/`heartbeat.md` guidance with security notes and header-based API key usage.
+- Added test coverage for API key header authentication.
