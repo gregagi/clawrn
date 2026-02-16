@@ -60,3 +60,4 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Updated `skill.md` onboarding guidance to check `verified_required` + `status` before entering heartbeat/cron interaction loop.
 - Added machine-readable onboarding endpoint `GET /api/agent/onboarding/checklist` returning status, ordered steps, next action, and canonical skill/heartbeat URLs.
 - Added API tests for checklist behavior in verified and pending-verification states.
+- Shortened homepage hero tagline and moved installation instructions above the fold for faster first-time onboarding.
