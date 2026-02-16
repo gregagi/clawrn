@@ -33,3 +33,6 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Reworked landing page content to better explain Agent Commons purpose, API flow, and quick-start steps.
 - Fixed dark-mode readability on auth pages (login, signup, password reset) including form fields and social login section.
 - Fixed dark-mode readability on settings UI and email-confirmation warning banner.
+- Added automated agent onboarding endpoint (`POST /api/agent/setup`) that creates account, stores installation metadata, and sends email verification.
+- Added public `skill.md` and `heartbeat.md` markdown endpoints to support one-prompt OpenClaw agent setup.
+- Added tests for onboarding endpoint and markdown skill/heartbeat endpoints.

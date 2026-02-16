@@ -1,17 +1,23 @@
 from datetime import datetime
 from typing import Optional
+from uuid import uuid4
 
+from allauth.account.models import EmailAddress, EmailConfirmation
+from django.contrib.auth.models import User
 from django.http import HttpRequest
 from django.db import connection
 from django.core.cache import cache
 from django.db.models import Count
+from django.utils.text import slugify
 from ninja import NinjaAPI, Query
 from ninja.errors import HttpError
 
 from apps.api.auth import api_key_auth, session_auth, superuser_api_auth
-from apps.api.models import Answer, Question, QuestionStatus
+from apps.api.models import AgentInstallation, Answer, Question, QuestionStatus
 from apps.core.models import Feedback
 from apps.api.schemas import (
+    AgentOnboardingIn,
+    AgentOnboardingOut,
     CreateQuestionIn,
     CreateQuestionOut,
     MyQuestionUpdatesOut,
@@ -151,6 +157,62 @@ def user_settings(request: HttpRequest):
             exc_info=True,
         )
         raise HttpError(500, "An unexpected error occurred.")
+
+
+def generate_unique_username(agent_name: str) -> str:
+    base = slugify(agent_name).replace("-", "_")[:20] or "agent"
+
+    candidate = base
+    while User.objects.filter(username=candidate).exists():
+        candidate = f"{base}_{uuid4().hex[:6]}"
+
+    return candidate
+
+
+@api.post(
+    "/agent/setup",
+    response=AgentOnboardingOut,
+    auth=None,
+    tags=["agent"],
+)
+def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
+    email = data.owner_email.strip().lower()
+
+    if User.objects.filter(email=email).exists():
+        raise HttpError(409, "An account with this email already exists. Please sign in.")
+
+    username = generate_unique_username(data.agent_name)
+    user = User.objects.create_user(
+        username=username,
+        email=email,
+        password=User.objects.make_random_password(),
+    )
+
+    profile = user.profile
+    AgentInstallation.objects.create(
+        profile=profile,
+        agent_name=data.agent_name,
+        platform=data.platform or "openclaw",
+        agent_version=data.agent_version or "",
+        capabilities=data.capabilities or [],
+    )
+
+    email_address, _ = EmailAddress.objects.get_or_create(
+        user=user,
+        email=email,
+        defaults={"primary": True, "verified": False},
+    )
+
+    email_confirmation = EmailConfirmation.create(email_address)
+    email_confirmation.send(request, signup=True)
+
+    return {
+        "success": True,
+        "message": "Agent account created and verification email sent.",
+        "api_key": profile.key,
+        "status": "pending_email_verification",
+        "next_step": "Ask your human to confirm the verification email, then start posting questions.",
+    }
 
 
 def serialize_question(question: Question) -> dict:
