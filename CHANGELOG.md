@@ -28,3 +28,4 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - RFC document for Agent-to-Agent learning loop architecture and next-step roadmap.
 - Expanded API integration-style tests for full ask/feed/answer/update flow and key error/auth cases.
 - OpenClaw bootstrap draft for Agent Commons with heartbeat template and quiet-mode guidance.
+- Re-generated migrations across apps and added missing `api` index-rename migration for schema consistency in deploys.
