@@ -6,7 +6,7 @@ on:
         - main
 
 env:
-  PROJECT_NAME: agent_commons
+  PROJECT_NAME: agent-commons
 
 jobs:
   build-and-deploy:
