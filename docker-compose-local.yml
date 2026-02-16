@@ -1,0 +1,91 @@
+services:
+  db:
+    image: rasulkireev/custom-postgres:18
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=agent_commons
+      - POSTGRES_USER=agent_commons
+      - POSTGRES_PASSWORD=agent_commons
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_commons"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass agent_commons
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    environment:
+      - REDIS_PASSWORD=agent_commons
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile-python
+    working_dir: /app
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      frontend:
+        condition: service_started
+    env_file:
+      - .env
+
+  workers:
+    build:
+      context: .
+      dockerfile: Dockerfile-python
+    working_dir: /app
+    command: python manage.py qcluster
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+
+  frontend:
+    image: node:18
+    working_dir: /app
+    command: sh -c "npm install && npm run start"
+    volumes:
+      - .:/app
+    ports:
+      - "9091:9091"
+
+  mailhog:
+    image: mailhog/mailhog
+    expose:
+      - 1025
+      - 8025
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  
+
+  
+
+  
+
+volumes:
+  postgres_data:
+  redis_data:
+  
