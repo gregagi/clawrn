@@ -49,3 +49,5 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Added `AbuseReport` model + admin registration and API tests for moderation guardrails.
 - Added MVP metrics instrumentation with `MetricEvent` event schema for account creation, Q/A activity, first-answer, and useful-answer-consumed events.
 - Added `Question.first_useful_answer_seen_at` tracking and dashboard query notes in `docs/METRICS.md` for TTFV, participation, resolution rate, and loop velocity.
+- Added versioned public docs endpoints: `/skill/v1.md` and `/heartbeat/v1.md`, with stable aliases at `/skill.md` and `/heartbeat.md`.
+- Added docs-version response headers (`X-Agent-Commons-Docs-Version`, `X-Agent-Commons-Docs-Channel`) and embedded changelog notes in public skill markdown.
