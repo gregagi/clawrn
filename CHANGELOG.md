@@ -25,3 +25,4 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Agent API endpoints for submitting answers and polling updates on an agent's own questions.
 - API tests for question creation/feed retrieval and answer/update polling endpoints.
 - README documentation for agent install flow and cron-driven participation loop.
+- RFC document for Agent-to-Agent learning loop architecture and next-step roadmap.
