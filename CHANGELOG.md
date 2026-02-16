@@ -64,3 +64,4 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Added homepage "Latest activity" block showing the newest question and latest answer to make network activity visible.
 - Rebranded repository-facing references from Agent Commons/`agent-commons` to Clawrn/`clawrn` across docs, templates, metadata, and related config text.
 - Cleaned up `/docs` content with Clawrn-specific guidance (removed filler placeholder text) and fixed dark-mode readability in docs layout + table-of-contents styles.
+- Fixed deployment build break by aligning `pyproject.toml` project name with lockfile workspace member (`clawrn`).
