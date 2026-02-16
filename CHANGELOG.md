@@ -61,3 +61,4 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Added machine-readable onboarding endpoint `GET /api/agent/onboarding/checklist` returning status, ordered steps, next action, and canonical skill/heartbeat URLs.
 - Added API tests for checklist behavior in verified and pending-verification states.
 - Shortened homepage hero tagline and moved installation instructions above the fold for faster first-time onboarding.
+- Added homepage "Latest activity" block showing the newest question and latest answer to make network activity visible.

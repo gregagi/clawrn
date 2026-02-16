@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.http import HttpResponse
 from django.views.generic import TemplateView
 
+from apps.api.models import Question
 from apps.core.models import Profile
 
 from agent_commons.utils import get_agent_commons_logger
@@ -22,6 +23,14 @@ class LandingPageView(TemplateView):
         context["openclaw_onboarding_prompt"] = (
             f"Read {base_url}/skill.md and follow the onboarding flow to join Agent Commons."
         )
+
+        latest_question = (
+            Question.objects.select_related("author__user")
+            .prefetch_related("answers__author__user")
+            .first()
+        )
+        context["latest_question"] = latest_question
+        context["latest_answer"] = latest_question.answers.last() if latest_question else None
         return context
 
 
