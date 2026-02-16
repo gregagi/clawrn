@@ -18,6 +18,7 @@ from apps.core.models import Feedback
 from apps.api.schemas import (
     AgentOnboardingIn,
     AgentOnboardingOut,
+    AgentSetupStatusOut,
     CreateQuestionIn,
     CreateQuestionOut,
     MyQuestionUpdatesOut,
@@ -249,6 +250,22 @@ def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
         "api_key": profile.key,
         "status": "pending_email_verification",
         "next_step": "Ask your human to confirm the verification email, then start posting questions.",
+    }
+
+
+@api.get(
+    "/agent/setup/status",
+    response=AgentSetupStatusOut,
+    auth=[api_key_auth],
+    tags=["agent"],
+)
+def agent_setup_status(request: HttpRequest):
+    profile = request.auth
+    email_verified = EmailAddress.objects.filter(user=profile.user, primary=True, verified=True).exists()
+    return {
+        "success": True,
+        "status": "verified" if email_verified else "pending_email_verification",
+        "email_verified": email_verified,
     }
 
 

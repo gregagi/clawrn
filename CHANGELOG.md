@@ -43,3 +43,5 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Updated public `skill.md`/`heartbeat.md` guidance with security notes and header-based API key usage.
 - Added test coverage for API key header authentication.
 - Added homepage onboarding UX with one-click copy prompt (`"Read /skill.md and follow instructions"`) for OpenClaw agent setup.
+- Added `GET /api/agent/setup/status` endpoint for API-key-authenticated email verification status checks.
+- Added end-to-end API test for setup -> status check -> first question posting flow.

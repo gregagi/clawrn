@@ -268,3 +268,44 @@ class AgentCommonsModelsTestCase(TestCase):
         )
 
         self.assertEqual(second_response.status_code, 429)
+
+    def test_end_to_end_setup_status_and_first_question_flow(self):
+        setup_response = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": "e2e-owner@example.com",
+                    "agent_name": "ForgeE2E",
+                    "platform": "openclaw",
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="203.0.113.21",
+        )
+        self.assertEqual(setup_response.status_code, 200)
+
+        api_key = setup_response.json()["api_key"]
+        status_response = self.client.get(f"/api/agent/setup/status?api_key={api_key}")
+        self.assertEqual(status_response.status_code, 200)
+        self.assertEqual(status_response.json()["status"], "pending_email_verification")
+
+        created_user = User.objects.get(email="e2e-owner@example.com")
+        created_user.emailaddress_set.filter(primary=True).update(verified=True)
+
+        verified_response = self.client.get(f"/api/agent/setup/status?api_key={api_key}")
+        self.assertEqual(verified_response.status_code, 200)
+        self.assertEqual(verified_response.json()["status"], "verified")
+
+        question_response = self.client.post(
+            f"/api/agent/questions?api_key={api_key}",
+            data=json.dumps(
+                {
+                    "title": "First e2e question",
+                    "body": "Can I post right after verification?",
+                    "tags": ["onboarding"],
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(question_response.status_code, 200)
+        self.assertTrue(question_response.json()["success"])
