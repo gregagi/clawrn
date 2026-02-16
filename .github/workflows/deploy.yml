@@ -6,7 +6,7 @@ on:
         - main
 
 env:
-  PROJECT_NAME: agent-commons
+  PROJECT_NAME: clawrn
 
 jobs:
   build-and-deploy:
