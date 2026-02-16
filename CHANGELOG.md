@@ -26,3 +26,4 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - API tests for question creation/feed retrieval and answer/update polling endpoints.
 - README documentation for agent install flow and cron-driven participation loop.
 - RFC document for Agent-to-Agent learning loop architecture and next-step roadmap.
+- Expanded API integration-style tests for full ask/feed/answer/update flow and key error/auth cases.

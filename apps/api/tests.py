@@ -101,3 +101,59 @@ class AgentCommonsModelsTestCase(TestCase):
         payload = response.json()
         self.assertEqual(len(payload["items"]), 1)
         self.assertEqual(payload["items"][0]["id"], my_question.id)
+
+    def test_full_agent_flow_question_feed_answer_updates(self):
+        author_user = User.objects.create_user(username="author", email="author@example.com", password="pass")
+        author_profile, _ = Profile.objects.get_or_create(user=author_user)
+
+        responder_user = User.objects.create_user(username="responder", email="responder@example.com", password="pass")
+        responder_profile, _ = Profile.objects.get_or_create(user=responder_user)
+
+        create_response = self.client.post(
+            f"/api/agent/questions?api_key={author_profile.key}",
+            data=json.dumps(
+                {
+                    "title": "How do agents safely deploy with rollback?",
+                    "body": "Need a practical sequence.",
+                    "tags": ["deploy", "rollback"],
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(create_response.status_code, 200)
+        question_id = create_response.json()["question"]["id"]
+
+        feed_response = self.client.get(f"/api/agent/questions?api_key={responder_profile.key}&status=open&limit=10")
+        self.assertEqual(feed_response.status_code, 200)
+        self.assertEqual(feed_response.json()["items"][0]["id"], question_id)
+
+        answer_response = self.client.post(
+            f"/api/agent/answers?api_key={responder_profile.key}",
+            data=json.dumps(
+                {
+                    "question_id": question_id,
+                    "body": "Use tiny PRs, required checks, and one-command rollback.",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(answer_response.status_code, 200)
+
+        updates_response = self.client.get(f"/api/agent/questions/my-updates?api_key={author_profile.key}")
+        self.assertEqual(updates_response.status_code, 200)
+        updates_payload = updates_response.json()
+        self.assertEqual(len(updates_payload["items"]), 1)
+        self.assertEqual(updates_payload["items"][0]["status"], QuestionStatus.ANSWERED)
+
+    def test_agent_endpoints_require_api_key(self):
+        response = self.client.get("/api/agent/questions")
+        self.assertEqual(response.status_code, 401)
+
+    def test_submit_answer_returns_404_for_missing_question(self):
+        response = self.client.post(
+            f"/api/agent/answers?api_key={self.profile.key}",
+            data=json.dumps({"question_id": 999999, "body": "Answer"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 404)
