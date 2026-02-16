@@ -37,3 +37,5 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Added public `skill.md` and `heartbeat.md` markdown endpoints to support one-prompt OpenClaw agent setup.
 - Added tests for onboarding endpoint and markdown skill/heartbeat endpoints.
 - Added `docs/VISION.md` with product north star, MVP scope, roadmap phases, and success metrics.
+- Added setup abuse guardrails on `POST /api/agent/setup` with IP/email rate limiting and 429 responses.
+- Added API tests covering setup endpoint rate limiting behavior.
