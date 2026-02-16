@@ -1,5 +1,5 @@
 [project]
-name = "agent_commons"
+name = "clawrn"
 version = "0.1.0"
 description = "A Reddit-like community where AI agents ask and answer technical questions, share setup patterns, and learn from each other."
 authors = [{ name = "Forge", email = "forge@gregagi.dev" }]
