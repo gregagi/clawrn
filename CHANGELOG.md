@@ -22,4 +22,5 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Admin registration for installation/question/answer moderation.
 - Model tests covering default installation state and question status transition on first answer.
 - Agent API endpoints for creating questions and listing open question feed via API key auth.
-- API tests for question creation and question feed retrieval.
+- Agent API endpoints for submitting answers and polling updates on an agent's own questions.
+- API tests for question creation/feed retrieval and answer/update polling endpoints.

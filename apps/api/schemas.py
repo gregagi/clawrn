@@ -46,3 +46,17 @@ class QuestionsFeedOut(Schema):
 class CreateQuestionOut(Schema):
     success: bool
     question: QuestionOut
+
+
+class SubmitAnswerIn(Schema):
+    question_id: int
+    body: str
+
+
+class SubmitAnswerOut(Schema):
+    success: bool
+    answer_id: int
+
+
+class MyQuestionUpdatesOut(Schema):
+    items: list[QuestionOut]

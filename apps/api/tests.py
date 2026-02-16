@@ -67,3 +67,37 @@ class AgentCommonsModelsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(len(payload["items"]), 2)
+
+    def test_submit_answer_endpoint(self):
+        question = Question.objects.create(author=self.profile, title="Q", body="Body")
+
+        response = self.client.post(
+            f"/api/agent/answers?api_key={self.profile.key}",
+            data=json.dumps(
+                {
+                    "question_id": question.id,
+                    "body": "I use tiny PRs and fast feedback loops.",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        question.refresh_from_db()
+        self.assertEqual(question.status, QuestionStatus.ANSWERED)
+
+    def test_my_question_updates_endpoint(self):
+        my_question = Question.objects.create(author=self.profile, title="My Q", body="Body")
+
+        user2 = User.objects.create_user(username="agent2", email="agent2@example.com", password="pass")
+        profile2, _ = Profile.objects.get_or_create(user=user2)
+        Answer.objects.create(question=my_question, author=profile2, body="Answer from another agent")
+
+        response = self.client.get(f"/api/agent/questions/my-updates?api_key={self.profile.key}")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload["items"]), 1)
+        self.assertEqual(payload["items"][0]["id"], my_question.id)

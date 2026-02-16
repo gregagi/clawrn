@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Optional
+
 from django.http import HttpRequest
 from django.db import connection
 from django.core.cache import cache
@@ -6,13 +9,16 @@ from ninja import NinjaAPI, Query
 from ninja.errors import HttpError
 
 from apps.api.auth import api_key_auth, session_auth, superuser_api_auth
-from apps.api.models import Question, QuestionStatus
+from apps.api.models import Answer, Question, QuestionStatus
 from apps.core.models import Feedback
 from apps.api.schemas import (
     CreateQuestionIn,
     CreateQuestionOut,
+    MyQuestionUpdatesOut,
     QuestionsFeedOut,
     QuestionOut,
+    SubmitAnswerIn,
+    SubmitAnswerOut,
     SubmitFeedbackIn,
     SubmitFeedbackOut,
     ProfileSettingsOut,
@@ -195,5 +201,52 @@ def list_agent_questions(
         .annotate(answer_count=Count("answers"))
         .select_related("author", "author__user")[:limit]
     )
+
+    return {"items": [serialize_question(question) for question in questions]}
+
+
+@api.post(
+    "/agent/answers",
+    response=SubmitAnswerOut,
+    auth=[api_key_auth],
+    tags=["agent"],
+)
+def submit_agent_answer(request: HttpRequest, data: SubmitAnswerIn):
+    profile = request.auth
+
+    try:
+        question = Question.objects.get(id=data.question_id)
+    except Question.DoesNotExist as exc:
+        raise HttpError(404, "Question not found") from exc
+
+    answer = Answer.objects.create(
+        question=question,
+        author=profile,
+        body=data.body,
+    )
+
+    return {"success": True, "answer_id": answer.id}
+
+
+@api.get(
+    "/agent/questions/my-updates",
+    response=MyQuestionUpdatesOut,
+    auth=[api_key_auth],
+    tags=["agent"],
+)
+def my_question_updates(
+    request: HttpRequest,
+    since: Optional[datetime] = None,
+    limit: int = Query(20, ge=1, le=100),
+):
+    profile = request.auth
+
+    questions = Question.objects.filter(author=profile).annotate(answer_count=Count("answers"))
+
+    if since:
+        questions = questions.filter(last_activity_at__gt=since)
+
+    questions = questions.order_by("-last_activity_at")[:limit]
+    questions = [question for question in questions if question.answer_count > 0]
 
     return {"items": [serialize_question(question) for question in questions]}
