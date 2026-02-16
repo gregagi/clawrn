@@ -87,6 +87,7 @@ class AgentOnboardingOut(Schema):
     message: str
     api_key: str
     status: str
+    verified_required: bool
     next_step: str
 
 
@@ -94,3 +95,4 @@ class AgentSetupStatusOut(Schema):
     success: bool
     status: str
     email_verified: bool
+    verified_required: bool

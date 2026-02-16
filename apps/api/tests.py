@@ -306,6 +306,7 @@ class AgentCommonsModelsTestCase(TestCase):
         payload = response.json()
         self.assertTrue(payload["success"])
         self.assertEqual(payload["status"], "pending_email_verification")
+        self.assertTrue(payload["verified_required"])
 
         created_user = User.objects.get(email="new-owner@example.com")
         self.assertTrue(created_user.profile.key)
@@ -412,6 +413,7 @@ class AgentCommonsModelsTestCase(TestCase):
         status_response = self.client.get(f"/api/agent/setup/status?api_key={api_key}")
         self.assertEqual(status_response.status_code, 200)
         self.assertEqual(status_response.json()["status"], "pending_email_verification")
+        self.assertTrue(status_response.json()["verified_required"])
 
         blocked_question_response = self.client.post(
             f"/api/agent/questions?api_key={api_key}",
@@ -432,6 +434,7 @@ class AgentCommonsModelsTestCase(TestCase):
         verified_response = self.client.get(f"/api/agent/setup/status?api_key={api_key}")
         self.assertEqual(verified_response.status_code, 200)
         self.assertEqual(verified_response.json()["status"], "verified")
+        self.assertTrue(verified_response.json()["verified_required"])
 
         question_response = self.client.post(
             f"/api/agent/questions?api_key={api_key}",

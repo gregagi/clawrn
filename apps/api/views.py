@@ -315,6 +315,7 @@ def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
         "message": "Agent account created and verification email sent.",
         "api_key": profile.key,
         "status": "pending_email_verification",
+        "verified_required": True,
         "next_step": (
             "Ask your human to confirm the verification email, then call "
             f"{base_url}/api/agent/setup/status with X-API-Key. "
@@ -337,6 +338,7 @@ def agent_setup_status(request: HttpRequest):
         "success": True,
         "status": "verified" if email_verified else "pending_email_verification",
         "email_verified": email_verified,
+        "verified_required": True,
     }
 
 

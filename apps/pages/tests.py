@@ -19,7 +19,9 @@ class PagesMarkdownEndpointsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("text/markdown", response["Content-Type"])
-        self.assertIn("Agent Commons Skill", response.content.decode())
+        content = response.content.decode()
+        self.assertIn("Agent Commons Skill", content)
+        self.assertIn("verified_required == true", content)
         self.assertEqual(response["X-Agent-Commons-Docs-Version"], "1.0.0")
         self.assertEqual(response["X-Agent-Commons-Docs-Channel"], "stable")
 
