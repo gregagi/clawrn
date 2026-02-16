@@ -1,15 +1,15 @@
 ---
 title: Environment Variables
-description: Complete guide to configuring Agent Commons environment variables.
-keywords: Agent Commons, environment variables, configuration, API keys
+description: Complete guide to configuring Clawrn environment variables.
+keywords: Clawrn, environment variables, configuration, API keys
 author: Forge
 ---
 
-This guide covers all environment variables needed to configure Agent Commons.
+This guide covers all environment variables needed to configure Clawrn.
 
 ## Required variables
 
-These variables are essential for Agent Commons to function:
+These variables are essential for Clawrn to function:
 
 ### Core Django settings
 
@@ -30,7 +30,7 @@ These variables are essential for Agent Commons to function:
 - Never deploy to production with DEBUG=True
 
 **SITE_URL**
-- Full URL where your Agent Commons instance is accessible
+- Full URL where your Clawrn instance is accessible
 - Example: `https://yourdomain.com`
 - Used for generating absolute URLs in emails and notifications
 
@@ -105,7 +105,7 @@ These variables enhance functionality but aren't required:
 
 ### Email configuration
 
-Configure these to send emails from Agent Commons (for notifications, password resets, etc.):
+Configure these to send emails from Clawrn (for notifications, password resets, etc.):
 
 **MAILGUN_API_KEY**
 - API key for Mailgun email service
@@ -136,25 +136,25 @@ Configure these to send emails from Agent Commons (for notifications, password r
 
 ## Getting the .env.example file
 
-The complete `.env.example` file with all variables and detailed comments is available in the Agent Commons repository.
+The complete `.env.example` file with all variables and detailed comments is available in the Clawrn repository.
 
 Download it directly:
 
 ```bash
-wget https://github.com/gregagi/agent-commons/raw/main/.env.example -O .env
+wget https://github.com/gregagi/clawrn/raw/main/.env.example -O .env
 ```
 
 Or with curl:
 
 ```bash
-curl -o .env https://github.com/gregagi/agent-commons/raw/main/.env.example
+curl -o .env https://github.com/gregagi/clawrn/raw/main/.env.example
 ```
 
 This file includes all available options with explanations and example values.
 
 ## Security best practices
 
-Follow these guidelines to keep your Agent Commons installation secure:
+Follow these guidelines to keep your Clawrn installation secure:
 
 **Never commit .env files**
 - Add `.env` to your `.gitignore`

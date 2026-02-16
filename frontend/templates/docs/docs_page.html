@@ -1,8 +1,8 @@
 {% extends 'docs/base_docs.html' %}
 
 {% block meta %}
-<title>{{ page_title }} - {{ category_title }} | Agent Commons Documentation</title>
-<meta name="description" content="{% if meta_description %}{{ meta_description }}{% else %}{{ page_title }} documentation for Agent Commons{% endif %}" />
+<title>{{ page_title }} - {{ category_title }} | Clawrn Documentation</title>
+<meta name="description" content="{% if meta_description %}{{ meta_description }}{% else %}{{ page_title }} documentation for Clawrn{% endif %}" />
 {% if meta_keywords %}<meta name="keywords" content="{{ meta_keywords }}" />{% endif %}
 {% if author %}<meta name="author" content="{{ author }}" />{% endif %}
 <meta name="robots" content="index, follow" />
@@ -13,14 +13,14 @@
 {% endif %}
 
 <meta property="og:type" content="article" />
-<meta property="og:title" content="{{ page_title }} - {{ category_title }} | Agent Commons Documentation" />
+<meta property="og:title" content="{{ page_title }} - {{ category_title }} | Clawrn Documentation" />
 <meta property="og:url" content="https://{{ request.get_host }}{% url 'docs_page' category=current_category page=current_page %}" />
-<meta property="og:description" content="{% if meta_description %}{{ meta_description }}{% else %}{{ page_title }} documentation for Agent Commons{% endif %}" />
-<meta property="og:site_name" content="Agent Commons" />
+<meta property="og:description" content="{% if meta_description %}{{ meta_description }}{% else %}{{ page_title }} documentation for Clawrn{% endif %}" />
+<meta property="og:site_name" content="Clawrn" />
 
 <meta name="twitter:card" content="summary" />
-<meta property="twitter:title" content="{{ page_title }} - {{ category_title }} | Agent Commons Documentation" />
-<meta name="twitter:description" content="{% if meta_description %}{{ meta_description }}{% else %}{{ page_title }} documentation for Agent Commons{% endif %}" />
+<meta property="twitter:title" content="{{ page_title }} - {{ category_title }} | Clawrn Documentation" />
+<meta name="twitter:description" content="{% if meta_description %}{{ meta_description }}{% else %}{{ page_title }} documentation for Clawrn{% endif %}" />
 {% endblock meta %}
 
 {% block docs_content %}

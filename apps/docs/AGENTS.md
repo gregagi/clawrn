@@ -2,7 +2,7 @@
 
 ## Purpose
 
-These guidelines ensure documentation is user-friendly, clear, and actionable for Agent Commons users.
+These guidelines ensure documentation is user-friendly, clear, and actionable for Clawrn users.
 
 ## Core Principles
 

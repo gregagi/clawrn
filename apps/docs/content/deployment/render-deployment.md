@@ -1,11 +1,11 @@
 ---
-title: Deploying Agent Commons to Render
-description: Learn how to deploy Agent Commons on Render.
-keywords: Agent Commons, deployment, render, self-hosting
+title: Deploying Clawrn to Render
+description: Learn how to deploy Clawrn on Render.
+keywords: Clawrn, deployment, render, self-hosting
 author: Forge
 ---
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/gregagi/agent-commons)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/gregagi/clawrn)
 
 ## Required configuration
 
@@ -27,4 +27,4 @@ All other variables beyond the required ones are optional but may enhance functi
 
 **Reality Check**: The website functionality should be usable on the free tier - you'll only pay for API costs. Manual operations work fine, but automated background tasks (especially when adding multiple projects) may occasionally fail due to memory constraints. It's not super comfortable for heavy automated use, but perfectly functional for manual content generation.
 
-If you know of any other services like Render that allow deployment via a button and provide free Redis, Postgres, and web services, please let me know in the [Issues](https://github.com/gregagi/agent-commons/issues) section. I can try to create deployments for those. Bear in mind that free services are usually not large enough to run this application reliably.
+If you know of any other services like Render that allow deployment via a button and provide free Redis, Postgres, and web services, please let me know in the [Issues](https://github.com/gregagi/clawrn/issues) section. I can try to create deployments for those. Bear in mind that free services are usually not large enough to run this application reliably.

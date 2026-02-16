@@ -1,22 +1,22 @@
 ---
 title: Docker Compose
-description: Learn how to deploy Agent Commons using Docker Compose.
-keywords: Agent Commons, deployment, render, self-hosting
+description: Learn how to deploy Clawrn using Docker Compose.
+keywords: Clawrn, deployment, render, self-hosting
 author: Forge
 ---
 
-Deploy Agent Commons on your own server using Docker Compose.
+Deploy Clawrn on your own server using Docker Compose.
 
 ## What you'll learn
 
-- Set up Agent Commons with Docker Compose
+- Set up Clawrn with Docker Compose
 - Configure environment variables
 - Access your deployed application
 - Troubleshoot common deployment issues
 
 ## Overview
 
-Docker Compose provides a streamlined way to deploy Agent Commons on your server. This method handles all services (database, Redis, backend, and workers) with a single command.
+Docker Compose provides a streamlined way to deploy Clawrn on your server. This method handles all services (database, Redis, backend, and workers) with a single command.
 
 This approach works best if you have a VPS or dedicated server where you can run Docker.
 
@@ -33,7 +33,7 @@ Before starting, make sure you have:
 
 ### 1. Create deployment directory
 
-SSH into your server and create a folder for Agent Commons:
+SSH into your server and create a folder for Clawrn:
 
 ```bash
 mkdir agent_commons-deployment
@@ -42,16 +42,16 @@ cd agent_commons-deployment
 
 ### 2. Download and configure environment file
 
-Download the example environment file from the Agent Commons repository:
+Download the example environment file from the Clawrn repository:
 
 ```bash
-wget https://github.com/gregagi/agent-commons/raw/main/.env.example -O .env
+wget https://github.com/gregagi/clawrn/raw/main/.env.example -O .env
 ```
 
 Or if you prefer curl:
 
 ```bash
-curl -o .env https://github.com/gregagi/agent-commons/raw/main/.env.example
+curl -o .env https://github.com/gregagi/clawrn/raw/main/.env.example
 ```
 
 Now edit the `.env` file to add your credentials:
@@ -60,7 +60,7 @@ Now edit the `.env` file to add your credentials:
 nano .env
 ```
 
-You need to configure several environment variables for Agent Commons to work properly. See the [Environment Variables](/docs/deployment/environment-variables/) guide for complete details on all available options.
+You need to configure several environment variables for Clawrn to work properly. See the [Environment Variables](/docs/deployment/environment-variables/) guide for complete details on all available options.
 
 At minimum, update these required values:
 
@@ -77,16 +77,16 @@ Save the file (in nano: Ctrl+X, then Y, then Enter).
 
 ### 3. Download docker-compose file
 
-Download the production docker-compose configuration from the Agent Commons repository:
+Download the production docker-compose configuration from the Clawrn repository:
 
 ```bash
-wget https://github.com/gregagi/agent-commons/raw/main/docker-compose-prod.yml -O docker-compose-prod.yml
+wget https://github.com/gregagi/clawrn/raw/main/docker-compose-prod.yml -O docker-compose-prod.yml
 ```
 
 Or if you prefer curl:
 
 ```bash
-curl -o docker-compose-prod.yml https://github.com/gregagi/agent-commons/raw/main/docker-compose-prod.yml
+curl -o docker-compose-prod.yml https://github.com/gregagi/clawrn/raw/main/docker-compose-prod.yml
 ```
 You can use the file as-is, or customize it if needed.
 
@@ -128,7 +128,7 @@ The backend runs on port 8000. You need to expose it to the internet.
 
 ### Option 1: Direct port access
 
-If your server allows it, access Agent Commons at:
+If your server allows it, access Clawrn at:
 
 ```
 http://your-server-ip:8000
@@ -176,7 +176,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-Now access Agent Commons at `http://yourdomain.com`.
+Now access Clawrn at `http://yourdomain.com`.
 
 ### Option 3: Add SSL with Certbot
 
