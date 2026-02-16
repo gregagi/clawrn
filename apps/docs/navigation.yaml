@@ -32,7 +32,7 @@ navigation:
     # Any pages not listed here will appear after these, in alphabetical order
 
   features:
-    - example-feature
+    - example_feature
 
   deployment:
     - render-deployment

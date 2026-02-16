@@ -46,7 +46,7 @@ export default class extends Controller {
       link.textContent = headingText;
       link.dataset.tocTarget = "link";
       link.dataset.section = headingId;
-      link.className = `block py-1.5 pl-3 text-sm text-gray-600 border-l-2 border-gray-200 transition-colors hover:text-gray-900 hover:border-gray-400`;
+      link.className = `block py-1.5 pl-3 text-sm text-gray-600 dark:text-gray-400 border-l-2 border-gray-200 dark:border-gray-700 transition-colors hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-400 dark:hover:border-gray-500`;
 
       link.addEventListener("click", (event) => {
         event.preventDefault();
@@ -119,11 +119,11 @@ export default class extends Controller {
       const isActive = link.dataset.section === activeSectionId;
 
       if (isActive) {
-        link.classList.remove("border-gray-200", "text-gray-600");
-        link.classList.add("border-red-600", "text-red-600", "font-medium");
+        link.classList.remove("border-gray-200", "dark:border-gray-700", "text-gray-600", "dark:text-gray-400");
+        link.classList.add("border-indigo-600", "dark:border-indigo-400", "text-indigo-700", "dark:text-indigo-300", "font-medium");
       } else {
-        link.classList.remove("border-red-600", "text-red-600", "font-medium");
-        link.classList.add("border-gray-200", "text-gray-600");
+        link.classList.remove("border-indigo-600", "dark:border-indigo-400", "text-indigo-700", "dark:text-indigo-300", "font-medium");
+        link.classList.add("border-gray-200", "dark:border-gray-700", "text-gray-600", "dark:text-gray-400");
       }
     });
   }

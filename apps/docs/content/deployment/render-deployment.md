@@ -1,30 +1,51 @@
 ---
 title: Deploying Clawrn to Render
-description: Learn how to deploy Clawrn on Render.
-keywords: Clawrn, deployment, render, self-hosting
+description: Deploy Clawrn on Render using the repository blueprint.
+keywords: Clawrn, deployment, render
 author: Forge
 ---
 
+Use this path if you want fast managed hosting without maintaining servers.
+
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/gregagi/clawrn)
 
-## Required configuration
+## What gets provisioned
 
-Before deploying, you need to configure environment variables. See the [Environment Variables](/docs/deployment/environment-variables/) guide for detailed information about all configuration options.
+The Render blueprint creates:
+- web service
+- worker service
+- Redis
+- Postgres
 
-Refer to the [Environment Variables](/docs/deployment/environment-variables/) guide for the complete list of required and optional variables.
+## Before you deploy
 
-All other variables beyond the required ones are optional but may enhance functionality.
+Review and set required env vars in Render:
+- `ENVIRONMENT=prod`
+- `DEBUG=off`
+- `SECRET_KEY`
+- `SITE_URL`
+- DB/Redis credentials if overriding generated values
 
-**Note:** This should work out of the box with Render's free tier if you provide the required configuration. Here's what you need to know about the limitations:
+See [Environment Variables](/docs/deployment/environment-variables/).
 
-- **Worker Service Limitation**: The worker service is not a dedicated worker type (those are only available on paid plans). For the free tier, I had to use a web service through a small hack, but it works fine for most use cases.
+## Verify after deploy
 
-- **Memory Constraints**: The free web service has a 512 MB RAM limit, which can cause issues with **automated background tasks only**. When you add a project, it runs a suite of background tasks to analyze your website, generate articles, keywords, and other content. These automated processes can hit memory limits and potentially cause failures.
+1. Open the app URL and confirm homepage loads.
+2. Check health endpoint:
 
-- **Manual Tasks Work Fine**: However, if you perform tasks manually (like generating a single article), these typically use the web service instead of the worker and should work reliably since it's one request at a time.
+```bash
+curl -sS https://YOUR_RENDER_DOMAIN/api/healthcheck
+```
 
-- **Upgrade Recommendation**: If you do upgrade to a paid plan, use the actual worker service instead of the web service workaround for better automated task reliability.
+Expected:
 
-**Reality Check**: The website functionality should be usable on the free tier - you'll only pay for API costs. Manual operations work fine, but automated background tasks (especially when adding multiple projects) may occasionally fail due to memory constraints. It's not super comfortable for heavy automated use, but perfectly functional for manual content generation.
+```json
+{"status":"healthy","checks":{"database":"healthy","redis":"healthy"}}
+```
 
-If you know of any other services like Render that allow deployment via a button and provide free Redis, Postgres, and web services, please let me know in the [Issues](https://github.com/gregagi/clawrn/issues) section. I can try to create deployments for those. Bear in mind that free services are usually not large enough to run this application reliably.
+3. Confirm worker service is running and not crash-looping.
+
+## Notes
+
+- Render free tiers may sleep and have resource limits.
+- For consistent background processing, paid worker plans are recommended.
