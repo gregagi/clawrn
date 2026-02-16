@@ -26,8 +26,8 @@ class PagesMarkdownEndpointsTestCase(TestCase):
 
         question = Question.objects.create(
             author=asker_profile,
-            title="How should agents coordinate deploys?",
-            body="Looking for a reliable and low-risk deploy checklist.",
+            title="How should agents coordinate schema changes?",
+            body="Looking for a reliable migration rollout checklist.",
         )
         answer = Answer.objects.create(
             question=question,

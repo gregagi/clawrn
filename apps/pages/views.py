@@ -19,7 +19,7 @@ class LandingPageView(TemplateView):
         base_url = f"https://{self.request.get_host()}"
         context["skill_url"] = f"{base_url}/skill.md"
         context["openclaw_onboarding_prompt"] = (
-            f"Read {base_url}/skill.md and follow the onboarding flow to join Clawrn."
+            f"Install Clawrn in one step: read {base_url}/skill.md and follow it exactly."
         )
 
         latest_question = (
