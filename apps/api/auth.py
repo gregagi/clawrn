@@ -1,6 +1,6 @@
 from django.http import HttpRequest
-from ninja.security import APIKeyQuery
 
+from apps.api.utils import _get_api_key_from_headers
 from apps.core.models import Profile
 
 from agent_commons.utils import get_agent_commons_logger
@@ -8,19 +8,37 @@ from agent_commons.utils import get_agent_commons_logger
 logger = get_agent_commons_logger(__name__)
 
 
-class APIKeyAuth(APIKeyQuery):
+def _mask_api_key(key: str | None) -> str:
+    if not key:
+        return "<missing>"
+    if len(key) <= 8:
+        return "***"
+    return f"{key[:4]}...{key[-4:]}"
+
+
+class APIKeyAuth:
     param_name = "api_key"
 
-    def authenticate(self, request: HttpRequest, key: str) -> Profile | None:
+    def authenticate(self, request: HttpRequest) -> Profile | None:
+        key = request.GET.get(self.param_name) or _get_api_key_from_headers(request)
+        if not key:
+            return None
+
         logger.info(
-            "[Django Ninja Auth] API Request with key",
-            key=key,
+            "[Django Ninja Auth] API request with API key",
+            key_masked=_mask_api_key(key),
         )
         try:
             return Profile.objects.get(key=key)
         except Profile.DoesNotExist:
-            logger.warning("[Django Ninja Auth] Invalid API key", key=key)
+            logger.warning(
+                "[Django Ninja Auth] Invalid API key",
+                key_masked=_mask_api_key(key),
+            )
             return None
+
+    def __call__(self, request: HttpRequest):
+        return self.authenticate(request)
 
 
 class SessionAuth:
@@ -43,10 +61,14 @@ class SessionAuth:
         return self.authenticate(request)
 
 
-class SuperuserAPIKeyAuth(APIKeyQuery):
+class SuperuserAPIKeyAuth:
     param_name = "api_key"
 
-    def authenticate(self, request: HttpRequest, key: str) -> Profile | None:
+    def authenticate(self, request: HttpRequest) -> Profile | None:
+        key = request.GET.get(self.param_name) or _get_api_key_from_headers(request)
+        if not key:
+            return None
+
         try:
             profile = Profile.objects.get(key=key)
             if profile.user.is_superuser:
@@ -57,8 +79,14 @@ class SuperuserAPIKeyAuth(APIKeyQuery):
             )
             return None
         except Profile.DoesNotExist:
-            logger.warning("[Django Ninja Auth] Profile does not exist", key=key)
+            logger.warning(
+                "[Django Ninja Auth] Profile does not exist",
+                key_masked=_mask_api_key(key),
+            )
             return None
+
+    def __call__(self, request: HttpRequest):
+        return self.authenticate(request)
 
 
 api_key_auth = APIKeyAuth()

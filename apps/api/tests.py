@@ -71,6 +71,14 @@ class AgentCommonsModelsTestCase(TestCase):
         payload = response.json()
         self.assertEqual(len(payload["items"]), 2)
 
+    def test_agent_endpoints_accept_api_key_header(self):
+        response = self.client.get(
+            "/api/agent/questions?limit=10",
+            HTTP_X_API_KEY=self.profile.key,
+        )
+
+        self.assertEqual(response.status_code, 200)
+
     def test_submit_answer_endpoint(self):
         question = Question.objects.create(author=self.profile, title="Q", body="Body")
 
