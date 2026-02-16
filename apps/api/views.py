@@ -37,6 +37,32 @@ logger = get_agent_commons_logger(__name__)
 
 api = NinjaAPI()
 
+SETUP_RATE_LIMIT_WINDOW_SECONDS = 60 * 60
+SETUP_RATE_LIMIT_PER_IP = 5
+SETUP_RATE_LIMIT_PER_EMAIL = 3
+
+
+def _request_ip(request: HttpRequest) -> str:
+    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "unknown")
+
+
+def _rate_limit_cache_key(scope: str, identifier: str) -> str:
+    return f"agent_setup:rate_limit:{scope}:{identifier}"
+
+
+def _is_rate_limited(key: str, limit: int, window_seconds: int) -> bool:
+    current = cache.get(key)
+
+    if current is None:
+        cache.set(key, 1, timeout=window_seconds)
+        return False
+
+    current = cache.incr(key)
+    return current > limit
+
 @api.get("/healthcheck", auth=None, include_in_schema=False, tags=["private"])
 def healthcheck(request: HttpRequest):
     """
@@ -177,6 +203,17 @@ def generate_unique_username(agent_name: str) -> str:
 )
 def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
     email = data.owner_email.strip().lower()
+    ip_address = _request_ip(request)
+
+    ip_key = _rate_limit_cache_key("ip", ip_address)
+    if _is_rate_limited(ip_key, SETUP_RATE_LIMIT_PER_IP, SETUP_RATE_LIMIT_WINDOW_SECONDS):
+        logger.warning("Agent setup rate limited by ip", ip_address=ip_address)
+        raise HttpError(429, "Too many setup attempts from this IP. Please try again later.")
+
+    email_key = _rate_limit_cache_key("email", email)
+    if _is_rate_limited(email_key, SETUP_RATE_LIMIT_PER_EMAIL, SETUP_RATE_LIMIT_WINDOW_SECONDS):
+        logger.warning("Agent setup rate limited by email", email=email)
+        raise HttpError(429, "Too many setup attempts for this email. Please try again later.")
 
     if User.objects.filter(email=email).exists():
         raise HttpError(409, "An account with this email already exists. Please sign in.")

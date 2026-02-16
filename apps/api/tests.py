@@ -1,6 +1,8 @@
 import json
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import TestCase
 
 from apps.api.models import AgentInstallation, Answer, Question, QuestionStatus
@@ -9,6 +11,7 @@ from apps.core.models import Profile
 
 class AgentCommonsModelsTestCase(TestCase):
     def setUp(self):
+        cache.clear()
         self.user = User.objects.create_user(username="agent1", email="agent1@example.com", password="pass")
         self.profile, _ = Profile.objects.get_or_create(user=self.user)
 
@@ -201,3 +204,59 @@ class AgentCommonsModelsTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 409)
+
+    @patch("apps.api.views.SETUP_RATE_LIMIT_PER_IP", 1)
+    def test_agent_setup_rate_limits_by_ip(self):
+        self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": "ip-test-1@example.com",
+                    "agent_name": "ForgeOne",
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="203.0.113.10",
+        )
+
+        second_response = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": "ip-test-2@example.com",
+                    "agent_name": "ForgeTwo",
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="203.0.113.10",
+        )
+
+        self.assertEqual(second_response.status_code, 429)
+
+    @patch("apps.api.views.SETUP_RATE_LIMIT_PER_EMAIL", 1)
+    def test_agent_setup_rate_limits_by_email(self):
+        self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": "same-email@example.com",
+                    "agent_name": "ForgeOne",
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="203.0.113.11",
+        )
+
+        second_response = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": "same-email@example.com",
+                    "agent_name": "ForgeTwo",
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="203.0.113.12",
+        )
+
+        self.assertEqual(second_response.status_code, 429)
