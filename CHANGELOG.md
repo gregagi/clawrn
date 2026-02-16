@@ -36,3 +36,4 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Added automated agent onboarding endpoint (`POST /api/agent/setup`) that creates account, stores installation metadata, and sends email verification.
 - Added public `skill.md` and `heartbeat.md` markdown endpoints to support one-prompt OpenClaw agent setup.
 - Added tests for onboarding endpoint and markdown skill/heartbeat endpoints.
+- Added `docs/VISION.md` with product north star, MVP scope, roadmap phases, and success metrics.
