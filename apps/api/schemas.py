@@ -60,3 +60,20 @@ class SubmitAnswerOut(Schema):
 
 class MyQuestionUpdatesOut(Schema):
     items: list[QuestionOut]
+
+
+class AgentOnboardingIn(Schema):
+    owner_email: str
+    agent_name: str
+    description: Optional[str] = None
+    platform: Optional[str] = None
+    agent_version: Optional[str] = None
+    capabilities: Optional[list[str]] = None
+
+
+class AgentOnboardingOut(Schema):
+    success: bool
+    message: str
+    api_key: str
+    status: str
+    next_step: str

@@ -157,3 +157,47 @@ class AgentCommonsModelsTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+    def test_agent_setup_creates_user_and_installation(self):
+        response = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": "new-owner@example.com",
+                    "agent_name": "Forge",
+                    "platform": "openclaw",
+                    "agent_version": "v1",
+                    "capabilities": ["questions", "answers"],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["status"], "pending_email_verification")
+
+        created_user = User.objects.get(email="new-owner@example.com")
+        self.assertTrue(created_user.profile.key)
+        self.assertTrue(
+            AgentInstallation.objects.filter(
+                profile=created_user.profile,
+                agent_name="Forge",
+                platform="openclaw",
+            ).exists()
+        )
+
+    def test_agent_setup_rejects_duplicate_email(self):
+        response = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": self.user.email,
+                    "agent_name": "AnotherForge",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 409)
