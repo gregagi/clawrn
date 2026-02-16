@@ -1,6 +1,7 @@
 import json
 from unittest.mock import patch
 
+from allauth.account.models import EmailAddress
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import TestCase
@@ -18,10 +19,18 @@ from apps.core.models import Profile
 
 
 class AgentCommonsModelsTestCase(TestCase):
+    def _verify_user(self, user: User):
+        EmailAddress.objects.update_or_create(
+            user=user,
+            email=user.email,
+            defaults={"primary": True, "verified": True},
+        )
+
     def setUp(self):
         cache.clear()
         self.user = User.objects.create_user(username="agent1", email="agent1@example.com", password="pass")
         self.profile, _ = Profile.objects.get_or_create(user=self.user)
+        self._verify_user(self.user)
 
     def test_agent_installation_defaults(self):
         installation = AgentInstallation.objects.create(
@@ -112,6 +121,7 @@ class AgentCommonsModelsTestCase(TestCase):
 
         user2 = User.objects.create_user(username="agent2", email="agent2@example.com", password="pass")
         profile2, _ = Profile.objects.get_or_create(user=user2)
+        self._verify_user(user2)
         Answer.objects.create(question=my_question, author=profile2, body="Answer from another agent")
 
         response = self.client.get(f"/api/agent/questions/my-updates?api_key={self.profile.key}")
@@ -134,9 +144,11 @@ class AgentCommonsModelsTestCase(TestCase):
     def test_full_agent_flow_question_feed_answer_updates(self):
         author_user = User.objects.create_user(username="author", email="author@example.com", password="pass")
         author_profile, _ = Profile.objects.get_or_create(user=author_user)
+        self._verify_user(author_user)
 
         responder_user = User.objects.create_user(username="responder", email="responder@example.com", password="pass")
         responder_profile, _ = Profile.objects.get_or_create(user=responder_user)
+        self._verify_user(responder_user)
 
         create_response = self.client.post(
             f"/api/agent/questions?api_key={author_profile.key}",
@@ -199,6 +211,14 @@ class AgentCommonsModelsTestCase(TestCase):
     def test_agent_endpoints_require_api_key(self):
         response = self.client.get("/api/agent/questions")
         self.assertEqual(response.status_code, 401)
+
+    def test_unverified_agent_cannot_access_qna_endpoints(self):
+        unverified_user = User.objects.create_user(username="nov", email="nov@example.com", password="pass")
+        unverified_profile, _ = Profile.objects.get_or_create(user=unverified_user)
+
+        response = self.client.get(f"/api/agent/questions?api_key={unverified_profile.key}")
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("Email verification required", response.json()["detail"])
 
     def test_submit_answer_returns_404_for_missing_question(self):
         response = self.client.post(
@@ -392,6 +412,19 @@ class AgentCommonsModelsTestCase(TestCase):
         status_response = self.client.get(f"/api/agent/setup/status?api_key={api_key}")
         self.assertEqual(status_response.status_code, 200)
         self.assertEqual(status_response.json()["status"], "pending_email_verification")
+
+        blocked_question_response = self.client.post(
+            f"/api/agent/questions?api_key={api_key}",
+            data=json.dumps(
+                {
+                    "title": "Blocked before verification",
+                    "body": "This should fail before owner confirms email.",
+                    "tags": ["onboarding"],
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(blocked_question_response.status_code, 403)
 
         created_user = User.objects.get(email="e2e-owner@example.com")
         created_user.emailaddress_set.filter(primary=True).update(verified=True)
