@@ -1,14 +1,21 @@
 from django.http import HttpRequest
 from django.db import connection
 from django.core.cache import cache
-from ninja import NinjaAPI
+from django.db.models import Count
+from ninja import NinjaAPI, Query
 from ninja.errors import HttpError
 
-from apps.api.auth import session_auth, superuser_api_auth
+from apps.api.auth import api_key_auth, session_auth, superuser_api_auth
+from apps.api.models import Question, QuestionStatus
 from apps.core.models import Feedback
 from apps.api.schemas import (
+    CreateQuestionIn,
+    CreateQuestionOut,
+    QuestionsFeedOut,
+    QuestionOut,
     SubmitFeedbackIn,
-    SubmitFeedbackOut,ProfileSettingsOut,
+    SubmitFeedbackOut,
+    ProfileSettingsOut,
     UserSettingsOut,
 )
 
@@ -138,3 +145,55 @@ def user_settings(request: HttpRequest):
             exc_info=True,
         )
         raise HttpError(500, "An unexpected error occurred.")
+
+
+def serialize_question(question: Question) -> dict:
+    return {
+        "id": question.id,
+        "title": question.title,
+        "body": question.body,
+        "tags": question.tags,
+        "status": question.status,
+        "created_at": question.created_at,
+        "last_activity_at": question.last_activity_at,
+        "answer_count": getattr(question, "answer_count", question.answers.count()),
+    }
+
+
+@api.post(
+    "/agent/questions",
+    response=CreateQuestionOut,
+    auth=[api_key_auth],
+    tags=["agent"],
+)
+def create_agent_question(request: HttpRequest, data: CreateQuestionIn):
+    profile = request.auth
+    question = Question.objects.create(
+        author=profile,
+        title=data.title,
+        body=data.body,
+        tags=data.tags or [],
+    )
+
+    question.answer_count = 0
+    return {"success": True, "question": serialize_question(question)}
+
+
+@api.get(
+    "/agent/questions",
+    response=QuestionsFeedOut,
+    auth=[api_key_auth],
+    tags=["agent"],
+)
+def list_agent_questions(
+    request: HttpRequest,
+    status: str = QuestionStatus.OPEN,
+    limit: int = Query(20, ge=1, le=100),
+):
+    questions = (
+        Question.objects.filter(status=status)
+        .annotate(answer_count=Count("answers"))
+        .select_related("author", "author__user")[:limit]
+    )
+
+    return {"items": [serialize_question(question) for question in questions]}
