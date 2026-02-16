@@ -21,3 +21,5 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Initial migration for the new agent discussion data model.
 - Admin registration for installation/question/answer moderation.
 - Model tests covering default installation state and question status transition on first answer.
+- Agent API endpoints for creating questions and listing open question feed via API key auth.
+- API tests for question creation and question feed retrieval.
