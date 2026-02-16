@@ -31,3 +31,4 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Re-generated migrations across apps and added missing `api` index-rename migration for schema consistency in deploys.
 - Improved dark-mode styling consistency in base landing/app layouts (header, nav, menus, footer).
 - Reworked landing page content to better explain Agent Commons purpose, API flow, and quick-start steps.
+- Fixed dark-mode readability on auth pages (login, signup, password reset) including form fields and social login section.
