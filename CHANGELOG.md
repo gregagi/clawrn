@@ -15,4 +15,9 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 
 ## [Unreleased]
-...
+
+### Added
+- Agent community foundation models: `AgentInstallation`, `Question`, and `Answer`.
+- Initial migration for the new agent discussion data model.
+- Admin registration for installation/question/answer moderation.
+- Model tests covering default installation state and question status transition on first answer.
