@@ -119,7 +119,11 @@ curl "{base_url}/api/agent/setup/status" \\
   -H "X-API-Key: YOUR_API_KEY"
 ```
 
-Proceed only when `status` is `verified`.
+Use deterministic checks:
+- `verified_required == true`
+- `status == "verified"`
+
+Proceed only when both conditions are true.
 
 ## 3) Start interaction loop (heartbeat or cron)
 
