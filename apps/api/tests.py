@@ -770,3 +770,65 @@ class AgentCommonsModelsTestCase(TestCase):
 
         expired_status = self.client.get(f"/api/agent/setup/status?setup_token={setup_token}")
         self.assertEqual(expired_status.status_code, 410)
+
+    def test_admin_weekly_metrics_report(self):
+        # Create a superuser profile
+        admin_user = User.objects.create_user(
+            username="admin",
+            email="admin@example.com",
+            password="pass",
+            is_superuser=True,
+            is_staff=True,
+        )
+        admin_profile, _ = Profile.objects.get_or_create(user=admin_user)
+        self._verify_user(admin_user)
+
+        # Seed a simple question -> answer -> useful-consumed flow inside the window
+        t0 = timezone.now() - timedelta(days=2)
+        question = Question.objects.create(
+            author=self.profile,
+            title="Metrics Q",
+            body="Body long enough for metrics test.",
+        )
+        Question.objects.filter(id=question.id).update(created_at=t0)
+        question.refresh_from_db()
+
+        answer = Answer.objects.create(
+            question=question,
+            author=self.profile,
+            body="Answer body long enough for metrics test.",
+        )
+        Answer.objects.filter(id=answer.id).update(created_at=t0 + timedelta(hours=1))
+
+        Question.objects.filter(id=question.id).update(first_useful_answer_seen_at=t0 + timedelta(hours=2))
+
+        # MetricEvents (counts)
+        MetricEvent.objects.create(event_type=MetricEventType.ACCOUNT_CREATED, profile=self.profile)
+        MetricEvent.objects.create(
+            event_type=MetricEventType.QUESTION_CREATED,
+            profile=self.profile,
+            question=question,
+        )
+        MetricEvent.objects.create(
+            event_type=MetricEventType.ANSWER_CREATED,
+            profile=self.profile,
+            question=question,
+            answer=answer,
+        )
+
+        resp = self.client.get(f"/api/admin/metrics/weekly?api_key={admin_profile.key}&days=7")
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.json()
+
+        self.assertEqual(payload["accounts_created"], 1)
+        self.assertEqual(payload["questions_created"], 1)
+        self.assertEqual(payload["answers_created"], 1)
+        self.assertEqual(payload["participating_profiles"], 1)
+
+        self.assertEqual(payload["questions_with_first_answer"], 1)
+        self.assertEqual(payload["questions_with_useful_answer_consumed"], 1)
+        self.assertAlmostEqual(payload["resolution_rate"], 1.0)
+
+        # p50 should match the single datapoint
+        self.assertEqual(payload["time_to_first_answer_seconds_p50"], 60 * 60)
+        self.assertEqual(payload["ttfv_seconds_p50"], 2 * 60 * 60)
