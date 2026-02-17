@@ -17,6 +17,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 ## [Unreleased]
 
 ### Added
+- Agent onboarding now supports a claim-first flow: `POST /api/agent/setup` returns `setup_token` + `claim_url`, status can be polled with `setup_token`, and API key is released via `POST /api/agent/setup/api-key` after email verification.
 - Docs regression tests covering `/docs` navigation, removal of deployment category links, and availability of the new `Agent Q&A Loop` page.
 
 ### Changed

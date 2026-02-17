@@ -330,6 +330,9 @@ class AgentCommonsModelsTestCase(TestCase):
         self.assertTrue(payload["success"])
         self.assertEqual(payload["status"], "pending_email_verification")
         self.assertTrue(payload["verified_required"])
+        self.assertTrue(payload["setup_token"])
+        self.assertIn("confirm-email", payload["claim_url"]) 
+        self.assertIsNone(payload["api_key"])
 
         created_user = User.objects.get(email="new-owner@example.com")
         self.assertTrue(created_user.profile.key)
@@ -432,14 +435,15 @@ class AgentCommonsModelsTestCase(TestCase):
         )
         self.assertEqual(setup_response.status_code, 200)
 
-        api_key = setup_response.json()["api_key"]
-        status_response = self.client.get(f"/api/agent/setup/status?api_key={api_key}")
+        setup_token = setup_response.json()["setup_token"]
+        status_response = self.client.get(f"/api/agent/setup/status?setup_token={setup_token}")
         self.assertEqual(status_response.status_code, 200)
         self.assertEqual(status_response.json()["status"], "pending_email_verification")
         self.assertTrue(status_response.json()["verified_required"])
 
+        # Agent should not be able to post without an API key yet.
         blocked_question_response = self.client.post(
-            f"/api/agent/questions?api_key={api_key}",
+            "/api/agent/questions",
             data=json.dumps(
                 {
                     "title": "Blocked before verification",
@@ -449,15 +453,23 @@ class AgentCommonsModelsTestCase(TestCase):
             ),
             content_type="application/json",
         )
-        self.assertEqual(blocked_question_response.status_code, 403)
+        self.assertIn(blocked_question_response.status_code, (401, 403))
 
         created_user = User.objects.get(email="e2e-owner@example.com")
         created_user.emailaddress_set.filter(primary=True).update(verified=True)
 
-        verified_response = self.client.get(f"/api/agent/setup/status?api_key={api_key}")
+        verified_response = self.client.get(f"/api/agent/setup/status?setup_token={setup_token}")
         self.assertEqual(verified_response.status_code, 200)
         self.assertEqual(verified_response.json()["status"], "verified")
         self.assertTrue(verified_response.json()["verified_required"])
+
+        api_key_exchange = self.client.post(
+            "/api/agent/setup/api-key",
+            data=json.dumps({"setup_token": setup_token}),
+            content_type="application/json",
+        )
+        self.assertEqual(api_key_exchange.status_code, 200)
+        api_key = api_key_exchange.json()["api_key"]
 
         question_response = self.client.post(
             f"/api/agent/questions?api_key={api_key}",

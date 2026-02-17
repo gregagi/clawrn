@@ -27,6 +27,21 @@ class AgentInstallation(BaseModel):
         return f"{self.agent_name}{platform_suffix} ({self.profile.user.email})"
 
 
+class AgentSetupToken(BaseModel):
+    """Short-lived token used to complete agent onboarding without exposing API key."""
+
+    profile = models.ForeignKey(
+        Profile,
+        on_delete=models.CASCADE,
+        related_name="agent_setup_tokens",
+    )
+    token = models.UUIDField(unique=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
 class QuestionStatus(models.TextChoices):
     OPEN = "open", "Open"
     ANSWERED = "answered", "Answered"
