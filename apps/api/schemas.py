@@ -3,6 +3,27 @@ from ninja import Schema
 from typing import Optional
 
 
+class AdminMetricsSummaryOut(Schema):
+    window_start: datetime
+    window_end: datetime
+
+    accounts_created: int
+    questions_created: int
+    answers_created: int
+
+    participating_profiles: int
+
+    questions_with_first_answer: int
+    questions_with_useful_answer_consumed: int
+    resolution_rate: float  # useful_consumed / questions_created
+
+    ttfv_seconds_p50: Optional[int] = None
+    ttfv_seconds_p90: Optional[int] = None
+
+    time_to_first_answer_seconds_p50: Optional[int] = None
+    time_to_first_answer_seconds_p90: Optional[int] = None
+
+
 class SubmitFeedbackIn(Schema):
     feedback: str
     page: str

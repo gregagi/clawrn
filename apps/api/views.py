@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
 
@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from django.http import HttpRequest
 from django.db import connection
 from django.core.cache import cache
-from django.db.models import Count
+from django.db.models import Count, Min
 from django.db.models import Q, Sum
 from django.db.models import Case, When, IntegerField, F
 from django.db.models.expressions import ExpressionWrapper
@@ -61,6 +61,7 @@ from apps.api.schemas import (
     ReportContentOut,
     ProfileSettingsOut,
     UserSettingsOut,
+    AdminMetricsSummaryOut,
 )
 
 from agent_commons.utils import get_agent_commons_logger
@@ -227,6 +228,109 @@ def healthcheck(request: HttpRequest):
             redis=health_status["checks"]["redis"]
         )
         return 503, health_status
+
+
+def _percentile_int(values: list[int], pct: float) -> int | None:
+    """Nearest-rank percentile.
+
+    values: list of ints (e.g., seconds). pct: 0-100.
+    """
+
+    if not values:
+        return None
+    if pct <= 0:
+        return int(min(values))
+    if pct >= 100:
+        return int(max(values))
+
+    values = sorted(values)
+    k = int((pct / 100) * (len(values) - 1))
+    return int(values[k])
+
+
+@api.get(
+    "/admin/metrics/weekly",
+    response=AdminMetricsSummaryOut,
+    auth=[superuser_api_auth],
+    include_in_schema=False,
+    tags=["admin"],
+)
+def admin_metrics_weekly(
+    request: HttpRequest,
+    days: int = Query(7, ge=1, le=90),
+):
+    """Weekly metrics report based on MetricEvent + Question/Answer timestamps.
+
+    Intended for internal, repeatable readouts.
+    """
+
+    window_end = timezone.now()
+    window_start = window_end - timedelta(days=days)
+
+    events = MetricEvent.objects.filter(created_at__gte=window_start, created_at__lt=window_end)
+
+    accounts_created = events.filter(event_type=MetricEventType.ACCOUNT_CREATED).count()
+    questions_created = events.filter(event_type=MetricEventType.QUESTION_CREATED).count()
+    answers_created = events.filter(event_type=MetricEventType.ANSWER_CREATED).count()
+
+    participating_profiles = (
+        events.filter(event_type__in=[MetricEventType.QUESTION_CREATED, MetricEventType.ANSWER_CREATED])
+        .exclude(profile__isnull=True)
+        .values("profile")
+        .distinct()
+        .count()
+    )
+
+    questions = Question.objects.filter(created_at__gte=window_start, created_at__lt=window_end)
+
+    # Time-to-first-answer (loop velocity proxy)
+    first_answer_times = list(
+        questions.annotate(first_answer_at=Min("answers__created_at"))
+        .exclude(first_answer_at__isnull=True)
+        .values_list("created_at", "first_answer_at")
+    )
+    time_to_first_answer_seconds = [
+        int((first - created).total_seconds())
+        for created, first in first_answer_times
+        if first and created
+    ]
+
+    # Time-to-first-value (proxy: first_useful_answer_seen_at)
+    ttfv_pairs = list(
+        questions.exclude(first_useful_answer_seen_at__isnull=True).values_list(
+            "created_at", "first_useful_answer_seen_at"
+        )
+    )
+    ttfv_seconds = [
+        int((seen - created).total_seconds())
+        for created, seen in ttfv_pairs
+        if seen and created
+    ]
+
+    questions_with_first_answer = len(time_to_first_answer_seconds)
+    questions_with_useful_answer_consumed = len(ttfv_seconds)
+
+    resolution_rate = (
+        float(questions_with_useful_answer_consumed) / float(questions_created)
+        if questions_created
+        else 0.0
+    )
+
+    return {
+        "window_start": window_start,
+        "window_end": window_end,
+        "accounts_created": accounts_created,
+        "questions_created": questions_created,
+        "answers_created": answers_created,
+        "participating_profiles": participating_profiles,
+        "questions_with_first_answer": questions_with_first_answer,
+        "questions_with_useful_answer_consumed": questions_with_useful_answer_consumed,
+        "resolution_rate": resolution_rate,
+        "ttfv_seconds_p50": _percentile_int(ttfv_seconds, 50),
+        "ttfv_seconds_p90": _percentile_int(ttfv_seconds, 90),
+        "time_to_first_answer_seconds_p50": _percentile_int(time_to_first_answer_seconds, 50),
+        "time_to_first_answer_seconds_p90": _percentile_int(time_to_first_answer_seconds, 90),
+    }
 
 
 @api.post(
