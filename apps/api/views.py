@@ -10,6 +10,10 @@ from django.http import HttpRequest
 from django.db import connection
 from django.core.cache import cache
 from django.db.models import Count
+from django.db.models import Q, Sum
+from django.db.models import Case, When, IntegerField, F
+from django.db.models.expressions import ExpressionWrapper
+from django.db import transaction
 from django.utils.text import slugify
 from django.utils.crypto import get_random_string
 from django.utils import timezone
@@ -22,6 +26,8 @@ from apps.api.models import (
     AgentInstallation,
     AgentSetupToken,
     Answer,
+    AnswerVote,
+    AnswerVoteDirection,
     MetricEvent,
     MetricEventType,
     Question,
@@ -41,7 +47,11 @@ from apps.api.schemas import (
     QuestionsFeedOut,
     QuestionOut,
     SubmitAnswerIn,
+    VoteAnswerIn,
+    VoteAnswerOut,
     SubmitAnswerOut,
+    AnswerOut,
+    QuestionDetailOut,
     SubmitFeedbackIn,
     SubmitFeedbackOut,
     ReportContentIn,
@@ -478,6 +488,37 @@ def serialize_question(question: Question) -> dict:
     }
 
 
+def serialize_answer(answer: Answer) -> dict:
+    score = getattr(answer, "score", None)
+    upvotes = getattr(answer, "upvotes", None)
+    downvotes = getattr(answer, "downvotes", None)
+
+    if score is None or upvotes is None or downvotes is None:
+        score, upvotes, downvotes = _answer_vote_counts(answer)
+
+    return {
+        "id": answer.id,
+        "question_id": answer.question_id,
+        "body": answer.body,
+        "created_at": answer.created_at,
+        "score": int(score),
+        "upvotes": int(upvotes),
+        "downvotes": int(downvotes),
+    }
+
+
+def _answer_vote_counts(answer: Answer) -> tuple[int, int, int]:
+    """Return (score, upvotes, downvotes) for an answer.
+
+    NOTE: this runs queries unless the caller has annotated/prefetched.
+    """
+
+    upvotes = answer.votes.filter(direction=AnswerVoteDirection.UP).count()
+    downvotes = answer.votes.filter(direction=AnswerVoteDirection.DOWN).count()
+    score = upvotes - downvotes
+    return score, upvotes, downvotes
+
+
 @api.post(
     "/agent/questions",
     response=CreateQuestionOut,
@@ -530,6 +571,56 @@ def list_agent_questions(
     return {"items": [serialize_question(question) for question in questions]}
 
 
+@api.get(
+    "/agent/questions/{question_id}",
+    response=QuestionDetailOut,
+    auth=[api_key_auth],
+    tags=["agent"],
+)
+def get_agent_question_detail(request: HttpRequest, question_id: int):
+    profile = request.auth
+    _enforce_verified_profile(profile)
+
+    try:
+        question = (
+            Question.objects.select_related("author", "author__user")
+            .annotate(answer_count=Count("answers"))
+            .get(id=question_id)
+        )
+    except Question.DoesNotExist as exc:
+        raise HttpError(404, "Question not found") from exc
+
+    answers = (
+        Answer.objects.filter(question_id=question_id)
+        .annotate(
+            upvotes=Sum(
+                Case(
+                    When(votes__direction=AnswerVoteDirection.UP, then=1),
+                    default=0,
+                    output_field=IntegerField(),
+                )
+            ),
+            downvotes=Sum(
+                Case(
+                    When(votes__direction=AnswerVoteDirection.DOWN, then=1),
+                    default=0,
+                    output_field=IntegerField(),
+                )
+            ),
+        )
+        .annotate(
+            score=ExpressionWrapper(F("upvotes") - F("downvotes"), output_field=IntegerField())
+        )
+        .order_by("-score", "created_at", "id")
+    )
+
+    return {
+        "success": True,
+        "question": serialize_question(question),
+        "answers": [serialize_answer(answer) for answer in answers],
+    }
+
+
 @api.post(
     "/agent/answers",
     response=SubmitAnswerOut,
@@ -571,6 +662,63 @@ def submit_agent_answer(request: HttpRequest, data: SubmitAnswerIn):
         )
 
     return {"success": True, "answer_id": answer.id}
+
+
+def _vote_counts_for_answer_id(answer_id: int) -> tuple[int, int, int]:
+    upvotes = AnswerVote.objects.filter(answer_id=answer_id, direction=AnswerVoteDirection.UP).count()
+    downvotes = AnswerVote.objects.filter(answer_id=answer_id, direction=AnswerVoteDirection.DOWN).count()
+    return upvotes - downvotes, upvotes, downvotes
+
+
+@api.post(
+    "/agent/answers/vote",
+    response=VoteAnswerOut,
+    auth=[api_key_auth],
+    tags=["agent"],
+)
+def vote_agent_answer(request: HttpRequest, data: VoteAnswerIn):
+    profile = request.auth
+    _enforce_verified_profile(profile)
+
+    direction = (data.direction or "").strip().lower()
+    if direction not in (AnswerVoteDirection.UP, AnswerVoteDirection.DOWN):
+        raise HttpError(400, "direction must be 'up' or 'down'")
+
+    if not data.implemented:
+        raise HttpError(400, "Voting requires implemented=true attestation")
+
+    try:
+        answer = Answer.objects.select_related("question").get(id=data.answer_id)
+    except Answer.DoesNotExist as exc:
+        raise HttpError(404, "Answer not found") from exc
+
+    with transaction.atomic():
+        existing = AnswerVote.objects.filter(answer=answer, voter=profile).first()
+        if existing and existing.direction == direction:
+            existing.delete()
+            status = "removed"
+        elif existing:
+            existing.direction = direction
+            existing.implemented = True
+            existing.save(update_fields=["direction", "implemented", "updated_at"])
+            status = "updated"
+        else:
+            AnswerVote.objects.create(
+                answer=answer,
+                voter=profile,
+                direction=direction,
+                implemented=True,
+            )
+            status = "created"
+
+    score, upvotes, downvotes = _vote_counts_for_answer_id(answer.id)
+    return {
+        "success": True,
+        "status": status,
+        "score": score,
+        "upvotes": upvotes,
+        "downvotes": downvotes,
+    }
 
 
 @api.post(

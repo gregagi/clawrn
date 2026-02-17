@@ -116,6 +116,94 @@ class AgentCommonsModelsTestCase(TestCase):
         question.refresh_from_db()
         self.assertEqual(question.status, QuestionStatus.ANSWERED)
 
+    def test_vote_answer_requires_implemented_attestation(self):
+        question = Question.objects.create(author=self.profile, title="Q", body="Body")
+        answer = Answer.objects.create(question=question, author=self.profile, body="Answer body")
+
+        response = self.client.post(
+            f"/api/agent/answers/vote?api_key={self.profile.key}",
+            data=json.dumps({"answer_id": answer.id, "direction": "up", "implemented": False}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_vote_answer_create_update_remove(self):
+        question = Question.objects.create(author=self.profile, title="Q", body="Body")
+
+        voter_user = User.objects.create_user(username="voter", email="voter@example.com", password="pass")
+        voter_profile, _ = Profile.objects.get_or_create(user=voter_user)
+        self._verify_user(voter_user)
+
+        answer = Answer.objects.create(question=question, author=self.profile, body="Answer body")
+
+        # create upvote
+        response = self.client.post(
+            f"/api/agent/answers/vote?api_key={voter_profile.key}",
+            data=json.dumps({"answer_id": answer.id, "direction": "up", "implemented": True}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["status"], "created")
+        self.assertEqual(payload["score"], 1)
+        self.assertEqual(payload["upvotes"], 1)
+        self.assertEqual(payload["downvotes"], 0)
+
+        # change to downvote
+        response = self.client.post(
+            f"/api/agent/answers/vote?api_key={voter_profile.key}",
+            data=json.dumps({"answer_id": answer.id, "direction": "down", "implemented": True}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "updated")
+        self.assertEqual(payload["score"], -1)
+        self.assertEqual(payload["upvotes"], 0)
+        self.assertEqual(payload["downvotes"], 1)
+
+        # same downvote again toggles removal
+        response = self.client.post(
+            f"/api/agent/answers/vote?api_key={voter_profile.key}",
+            data=json.dumps({"answer_id": answer.id, "direction": "down", "implemented": True}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "removed")
+        self.assertEqual(payload["score"], 0)
+        self.assertEqual(payload["upvotes"], 0)
+        self.assertEqual(payload["downvotes"], 0)
+
+    def test_question_detail_sorts_answers_by_score(self):
+        question = Question.objects.create(author=self.profile, title="Q", body="Body")
+
+        answer1 = Answer.objects.create(question=question, author=self.profile, body="Answer 1")
+        answer2 = Answer.objects.create(question=question, author=self.profile, body="Answer 2")
+
+        voter_user = User.objects.create_user(username="voter2", email="voter2@example.com", password="pass")
+        voter_profile, _ = Profile.objects.get_or_create(user=voter_user)
+        self._verify_user(voter_user)
+
+        # Give answer2 a higher score.
+        vote_response = self.client.post(
+            f"/api/agent/answers/vote?api_key={voter_profile.key}",
+            data=json.dumps({"answer_id": answer2.id, "direction": "up", "implemented": True}),
+            content_type="application/json",
+        )
+        self.assertEqual(vote_response.status_code, 200)
+
+        detail_response = self.client.get(
+            f"/api/agent/questions/{question.id}?api_key={voter_profile.key}"
+        )
+        self.assertEqual(detail_response.status_code, 200)
+        payload = detail_response.json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["question"]["id"], question.id)
+        self.assertEqual([a["id"] for a in payload["answers"]], [answer2.id, answer1.id])
+        self.assertEqual(payload["answers"][0]["score"], 1)
+
     def test_my_question_updates_endpoint(self):
         my_question = Question.objects.create(author=self.profile, title="My Q", body="Body")
 
