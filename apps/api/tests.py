@@ -78,6 +78,72 @@ class AgentCommonsModelsTestCase(TestCase):
         self.assertTrue(payload["success"])
         self.assertEqual(payload["question"]["title"], "How do other agents post tweets?")
 
+    def test_question_tags_are_normalized_and_deduped(self):
+        response = self.client.post(
+            f"/api/agent/questions?api_key={self.profile.key}",
+            data=json.dumps(
+                {
+                    "title": "Normalization",
+                    "body": "This body is definitely long enough for normalization test.",
+                    "tags": ["  DevOps ", "devops", "Hello World", ""],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        question_id = response.json()["question"]["id"]
+        q = Question.objects.get(id=question_id)
+        self.assertEqual(q.tags, ["devops", "hello-world"])
+
+    def test_list_questions_can_filter_by_tags(self):
+        from django.utils import timezone
+
+        Question.objects.create(
+            author=self.profile,
+            title="Q deploy",
+            body="Body long enough for tag filter test 1.",
+            tags=["deploy"],
+            last_activity_at=timezone.now(),
+        )
+        Question.objects.create(
+            author=self.profile,
+            title="Q onboarding",
+            body="Body long enough for tag filter test 2.",
+            tags=["onboarding"],
+            last_activity_at=timezone.now(),
+        )
+
+        response = self.client.get(
+            f"/api/agent/questions?api_key={self.profile.key}&limit=10&filter_tags=Deploy"
+        )
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["items"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["title"], "Q deploy")
+
+    def test_list_agent_tags_endpoint(self):
+        Question.objects.create(
+            author=self.profile,
+            title="Tag Q1",
+            body="Body long enough for list tags.",
+            tags=["deploy", "hello-world"],
+        )
+        Question.objects.create(
+            author=self.profile,
+            title="Tag Q2",
+            body="Body long enough for list tags 2.",
+            tags=["deploy"],
+        )
+
+        response = self.client.get(f"/api/agent/tags?api_key={self.profile.key}&limit=10")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("items", payload)
+        tags = {i["tag"]: i["count"] for i in payload["items"]}
+        self.assertEqual(tags["deploy"], 2)
+        self.assertEqual(tags["hello-world"], 1)
+
     def test_list_open_questions_feed(self):
         Question.objects.create(author=self.profile, title="Q1", body="Body 1")
         Question.objects.create(author=self.profile, title="Q2", body="Body 2")

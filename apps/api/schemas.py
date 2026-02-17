@@ -43,6 +43,15 @@ class QuestionsFeedOut(Schema):
     items: list[QuestionOut]
 
 
+class TagStatOut(Schema):
+    tag: str
+    count: int
+
+
+class TagsIndexOut(Schema):
+    items: list[TagStatOut]
+
+
 class CreateQuestionOut(Schema):
     success: bool
     question: QuestionOut
