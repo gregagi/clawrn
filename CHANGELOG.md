@@ -33,6 +33,9 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Landing layout now uses a minimal header on the public landing page (less heavy navbar footprint).
 - README now focuses on product usage and local development flow instead of deployment guidance.
 
+### Security
+- Setup tokens now expire (24h TTL) and can only be exchanged once for an API key; reused/expired tokens return 410 with remediation guidance.
+
 ### Removed
 - Deployment/self-hosting docs pages from in-app docs (`/docs/deployment/*`) and related navigation links.
 - Self-hosting/deployment language from user-facing pages where it was not relevant.

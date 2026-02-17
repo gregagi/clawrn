@@ -72,6 +72,11 @@ api = NinjaAPI()
 SETUP_RATE_LIMIT_WINDOW_SECONDS = 60 * 60
 SETUP_RATE_LIMIT_PER_IP = 5
 SETUP_RATE_LIMIT_PER_EMAIL = 3
+
+# Setup tokens should be short-lived to limit abuse and reduce the chance of leaked tokens
+# being exchanged later.
+SETUP_TOKEN_TTL_SECONDS = 60 * 60 * 24  # 24h
+
 POST_RATE_LIMIT_WINDOW_SECONDS = 60
 POST_QUESTION_RATE_LIMIT = 10
 POST_ANSWER_RATE_LIMIT = 20
@@ -98,6 +103,11 @@ def _is_rate_limited(key: str, limit: int, window_seconds: int) -> bool:
 
     current = cache.incr(key)
     return current > limit
+
+
+def _setup_token_is_expired(token_obj: "AgentSetupToken") -> bool:
+    age_seconds = (timezone.now() - token_obj.created_at).total_seconds()
+    return age_seconds > SETUP_TOKEN_TTL_SECONDS
 
 
 def _post_rate_limit_cache_key(scope: str, profile_id: int) -> str:
@@ -369,9 +379,16 @@ def agent_setup_status(request: HttpRequest, setup_token: Optional[str] = None):
             token_obj = AgentSetupToken.objects.select_related("profile", "profile__user").get(
                 token=setup_token
             )
-            profile = token_obj.profile
         except AgentSetupToken.DoesNotExist as exc:
             raise HttpError(404, "Invalid setup_token") from exc
+
+        if token_obj.used_at is not None:
+            raise HttpError(410, "setup_token already used. Use the API key returned during exchange.")
+
+        if _setup_token_is_expired(token_obj):
+            raise HttpError(410, "setup_token expired. Re-run /api/agent/setup to generate a new token.")
+
+        profile = token_obj.profile
     else:
         # Back-compat: allow polling with api_key
         profile = api_key_auth(request)
@@ -407,14 +424,19 @@ def agent_setup_api_key(request: HttpRequest, data: AgentApiKeyExchangeIn):
     except AgentSetupToken.DoesNotExist as exc:
         raise HttpError(404, "Invalid setup_token") from exc
 
+    if token_obj.used_at is not None:
+        raise HttpError(410, "setup_token already used. Re-run /api/agent/setup if you lost the API key.")
+
+    if _setup_token_is_expired(token_obj):
+        raise HttpError(410, "setup_token expired. Re-run /api/agent/setup to generate a new token.")
+
     profile = token_obj.profile
     email_verified = EmailAddress.objects.filter(user=profile.user, primary=True, verified=True).exists()
     if not email_verified:
-        raise HttpError(403, "Owner email not verified yet")
+        raise HttpError(403, "Owner email not verified yet. Ask the owner to click the claim_url, then try again.")
 
-    if token_obj.used_at is None:
-        token_obj.used_at = timezone.now()
-        token_obj.save(update_fields=["used_at"])
+    token_obj.used_at = timezone.now()
+    token_obj.save(update_fields=["used_at"])
 
     return {
         "success": True,

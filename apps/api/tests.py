@@ -1,14 +1,17 @@
 import json
+from datetime import timedelta
 from unittest.mock import patch
 
 from allauth.account.models import EmailAddress
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import TestCase
+from django.utils import timezone
 
 from apps.api.models import (
     AbuseReport,
     AgentInstallation,
+    AgentSetupToken,
     Answer,
     MetricEvent,
     MetricEventType,
@@ -683,3 +686,87 @@ class AgentCommonsModelsTestCase(TestCase):
         )
         self.assertEqual(question_response.status_code, 200)
         self.assertTrue(question_response.json()["success"])
+
+    def test_setup_token_cannot_be_reused_for_api_key_exchange(self):
+        setup_response = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": "reuse-owner@example.com",
+                    "agent_name": "ForgeReuse",
+                    "platform": "openclaw",
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="203.0.113.31",
+        )
+        self.assertEqual(setup_response.status_code, 200)
+
+        setup_token = setup_response.json()["setup_token"]
+        created_user = User.objects.get(email="reuse-owner@example.com")
+        created_user.emailaddress_set.filter(primary=True).update(verified=True)
+
+        first_exchange = self.client.post(
+            "/api/agent/setup/api-key",
+            data=json.dumps({"setup_token": setup_token}),
+            content_type="application/json",
+        )
+        self.assertEqual(first_exchange.status_code, 200)
+        self.assertTrue(first_exchange.json()["api_key"])
+
+        second_exchange = self.client.post(
+            "/api/agent/setup/api-key",
+            data=json.dumps({"setup_token": setup_token}),
+            content_type="application/json",
+        )
+        self.assertEqual(second_exchange.status_code, 410)
+
+    def test_setup_status_rejects_used_setup_token(self):
+        setup_response = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": "used-status-owner@example.com",
+                    "agent_name": "ForgeUsedStatus",
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="203.0.113.32",
+        )
+        self.assertEqual(setup_response.status_code, 200)
+
+        setup_token = setup_response.json()["setup_token"]
+        created_user = User.objects.get(email="used-status-owner@example.com")
+        created_user.emailaddress_set.filter(primary=True).update(verified=True)
+
+        exchange = self.client.post(
+            "/api/agent/setup/api-key",
+            data=json.dumps({"setup_token": setup_token}),
+            content_type="application/json",
+        )
+        self.assertEqual(exchange.status_code, 200)
+
+        status_after_use = self.client.get(f"/api/agent/setup/status?setup_token={setup_token}")
+        self.assertEqual(status_after_use.status_code, 410)
+
+    @patch("apps.api.views.SETUP_TOKEN_TTL_SECONDS", 1)
+    def test_setup_token_expires(self):
+        setup_response = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": "expired-owner@example.com",
+                    "agent_name": "ForgeExpired",
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="203.0.113.33",
+        )
+        self.assertEqual(setup_response.status_code, 200)
+
+        setup_token = setup_response.json()["setup_token"]
+        token_obj = AgentSetupToken.objects.get(token=setup_token)
+        AgentSetupToken.objects.filter(id=token_obj.id).update(created_at=timezone.now() - timedelta(days=2))
+
+        expired_status = self.client.get(f"/api/agent/setup/status?setup_token={setup_token}")
+        self.assertEqual(expired_status.status_code, 410)
