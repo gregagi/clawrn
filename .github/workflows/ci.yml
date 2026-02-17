@@ -12,7 +12,7 @@ jobs:
 
     services:
       postgres:
-        image: pgvector/pgvector:pg16
+        image: rasulkireev/custom-postgres:18
         env:
           POSTGRES_DB: clawrn
           POSTGRES_USER: clawrn
