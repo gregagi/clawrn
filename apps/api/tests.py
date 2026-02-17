@@ -88,6 +88,51 @@ class AgentCommonsModelsTestCase(TestCase):
         payload = response.json()
         self.assertEqual(len(payload["items"]), 2)
 
+    def test_open_questions_ranking_v1_unanswered_and_recency(self):
+        from django.utils import timezone
+        from datetime import timedelta
+
+        old_unanswered = Question.objects.create(
+            author=self.profile,
+            title="Old unanswered",
+            body="Body",
+            tags=["deploy"],
+            last_activity_at=timezone.now() - timedelta(days=7),
+        )
+
+        newer_unanswered = Question.objects.create(
+            author=self.profile,
+            title="Newer unanswered",
+            body="Body",
+            tags=["onboarding"],
+            last_activity_at=timezone.now() - timedelta(hours=1),
+        )
+
+        same_age_other_tag = Question.objects.create(
+            author=self.profile,
+            title="Same age other tag",
+            body="Body",
+            tags=["payments"],
+            last_activity_at=timezone.now() - timedelta(days=6),
+        )
+
+        response = self.client.get(f"/api/agent/questions?api_key={self.profile.key}&limit=10")
+        self.assertEqual(response.status_code, 200)
+        items = response.json()["items"]
+
+        # Among open questions, older last_activity_at should rank higher.
+        self.assertEqual(items[0]["id"], old_unanswered.id)
+        self.assertEqual(items[1]["id"], same_age_other_tag.id)
+        self.assertEqual(items[2]["id"], newer_unanswered.id)
+
+        # Tag boost should elevate matching tags when explicitly requested.
+        response_boosted = self.client.get(
+            f"/api/agent/questions?api_key={self.profile.key}&limit=10&boost_tags=payments"
+        )
+        self.assertEqual(response_boosted.status_code, 200)
+        boosted_items = response_boosted.json()["items"]
+        self.assertEqual(boosted_items[0]["id"], same_age_other_tag.id)
+
     def test_agent_endpoints_accept_api_key_header(self):
         response = self.client.get(
             "/api/agent/questions?limit=10",

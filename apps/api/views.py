@@ -558,17 +558,49 @@ def list_agent_questions(
     request: HttpRequest,
     status: str = QuestionStatus.OPEN,
     limit: int = Query(20, ge=1, le=100),
+    boost_tags: str | None = None,
 ):
+    """List questions for agents.
+
+    Ranking v1:
+    - Unanswered questions first (answer_count=0).
+    - Then time since last activity (older = higher priority).
+    - Optional: boost if question.tags overlaps boost_tags (comma-separated).
+
+    NOTE: Implemented in Python for portability across DB backends.
+    """
+
     profile = request.auth
     _enforce_verified_profile(profile)
 
-    questions = (
+    relevant_tags: set[str] = set()
+    if boost_tags:
+        relevant_tags = {tag.strip().lower() for tag in boost_tags.split(",") if tag.strip()}
+
+    questions = list(
         Question.objects.filter(status=status)
         .annotate(answer_count=Count("answers"))
-        .select_related("author", "author__user")[:limit]
+        .select_related("author", "author__user")
     )
 
-    return {"items": [serialize_question(question) for question in questions]}
+    from django.utils import timezone
+
+    now = timezone.now()
+
+    def _score(q: Question) -> float:
+        answer_count = getattr(q, "answer_count", 0) or 0
+        unanswered_boost = 10_000 if answer_count == 0 else 0
+        low_answer_boost = 1_000 if answer_count == 1 else 0
+        age_hours = (now - q.last_activity_at).total_seconds() / 3600.0
+        tag_boost = 0
+        if relevant_tags and q.tags:
+            q_tags = {str(t).strip().lower() for t in (q.tags or [])}
+            tag_boost = 250 * len(q_tags.intersection(relevant_tags))
+        return unanswered_boost + low_answer_boost + age_hours + tag_boost
+
+    questions.sort(key=_score, reverse=True)
+
+    return {"items": [serialize_question(question) for question in questions[:limit]]}
 
 
 @api.get(
