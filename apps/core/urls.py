@@ -9,5 +9,6 @@ urlpatterns = [
     path("admin-panel", views.AdminPanelView.as_view(), name="admin_panel"),
     # Utils
     path("resend-confirmation/", views.resend_confirmation_email, name="resend_confirmation"),
-    
+    path("api-key/rotate/", views.rotate_api_key, name="rotate_api_key"),
+
 ]

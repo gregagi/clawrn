@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+
 from django.contrib.messages.views import SuccessMessageMixin
 from django.shortcuts import redirect
 from django.conf import settings
@@ -19,6 +20,7 @@ from django.views.generic import TemplateView, UpdateView
 
 from apps.core.forms import ProfileUpdateForm
 from apps.core.models import Profile
+from apps.core.model_utils import generate_random_key
 
 from agent_commons.utils import get_agent_commons_logger
 
@@ -34,7 +36,12 @@ class HomeView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        
+        user = self.request.user
+        # allauth stores email verification state in EmailAddress
+        email_address = EmailAddress.objects.filter(user=user, email=user.email).first()
+        context["email_verified"] = email_address.verified if email_address else False
+        context["api_key"] = user.profile.key
+        context["rotate_api_key_url"] = reverse("rotate_api_key")
 
         return context
 
@@ -54,8 +61,8 @@ class UserSettingsView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         user = self.request.user
 
-        email_address = EmailAddress.objects.get_for_user(user, user.email)
-        context["email_verified"] = email_address.verified
+        email_address = EmailAddress.objects.filter(user=user, email=user.email).first()
+        context["email_verified"] = email_address.verified if email_address else False
         context["resend_confirmation_url"] = reverse("resend_confirmation")
         
         context["api_key"] = user.profile.key
@@ -64,6 +71,7 @@ class UserSettingsView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         return context
 
 @login_required
+@require_POST
 def resend_confirmation_email(request):
     user = request.user
 
@@ -112,6 +120,23 @@ def resend_confirmation_email(request):
     return redirect("settings")
 
 
+
+@login_required
+@require_POST
+def rotate_api_key(request):
+    user = request.user
+
+    email_address = EmailAddress.objects.filter(user=user, email=user.email).first()
+    if not email_address or not email_address.verified:
+        messages.error(request, "Please confirm your email before creating an API key.")
+        return redirect("home")
+
+    profile = user.profile
+    profile.key = generate_random_key()
+    profile.save(update_fields=["key", "updated_at"])
+
+    messages.success(request, "API key created.")
+    return redirect("home")
 
 
 class AdminPanelView(UserPassesTestMixin, TemplateView):
