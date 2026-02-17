@@ -66,6 +66,9 @@ jobs:
       - name: Set up Python (uv-managed)
         run: uv python install 3.14
 
+      - name: Check lockfile is up-to-date (pyproject.toml ↔ uv.lock)
+        run: uv lock --check
+
       - name: Sync dependencies
         run: uv sync --frozen
 
