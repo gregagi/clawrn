@@ -85,10 +85,25 @@ class AgentOnboardingIn(Schema):
 class AgentOnboardingOut(Schema):
     success: bool
     message: str
-    api_key: str
     status: str
     verified_required: bool
     next_step: str
+    # New onboarding flow: don't require the agent to store the API key until
+    # the human owner has claimed the agent.
+    setup_token: str
+    claim_url: str
+    api_key: Optional[str] = None
+
+
+class AgentApiKeyExchangeIn(Schema):
+    setup_token: str
+
+
+class AgentApiKeyExchangeOut(Schema):
+    success: bool
+    status: str
+    verified_required: bool
+    api_key: str
 
 
 class AgentSetupStatusOut(Schema):

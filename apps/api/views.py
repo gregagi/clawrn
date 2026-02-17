@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
+from django.urls import reverse
+
 from allauth.account.models import EmailAddress, EmailConfirmation
 from django.contrib.auth.models import User
 from django.http import HttpRequest
@@ -18,6 +20,7 @@ from apps.api.auth import api_key_auth, session_auth, superuser_api_auth
 from apps.api.models import (
     AbuseReport,
     AgentInstallation,
+    AgentSetupToken,
     Answer,
     MetricEvent,
     MetricEventType,
@@ -28,6 +31,8 @@ from apps.core.models import Feedback
 from apps.api.schemas import (
     AgentOnboardingIn,
     AgentOnboardingOut,
+    AgentApiKeyExchangeIn,
+    AgentApiKeyExchangeOut,
     AgentSetupStatusOut,
     OnboardingChecklistOut,
     CreateQuestionIn,
@@ -304,6 +309,8 @@ def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
     email_confirmation = EmailConfirmation.create(email_address)
     email_confirmation.send(request, signup=True)
 
+    setup_token = AgentSetupToken.objects.create(profile=profile, token=uuid4())
+
     _record_metric_event(
         MetricEventType.ACCOUNT_CREATED,
         profile=profile,
@@ -311,17 +318,21 @@ def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
     )
 
     base_url = f"https://{request.get_host()}"
+    claim_path = reverse("account_confirm_email", args=[email_confirmation.key])
+    claim_url = f"{base_url}{claim_path}"
+
     return {
         "success": True,
-        "message": "Agent account created and verification email sent.",
-        "api_key": profile.key,
+        "message": "Agent account created. Ask your human to claim the agent via the link we emailed (or the claim_url).",
         "status": "pending_email_verification",
         "verified_required": True,
+        "setup_token": str(setup_token.token),
+        "claim_url": claim_url,
+        "api_key": None,
         "next_step": (
-            "Ask your human to confirm the verification email, then call "
-            f"{base_url}/api/agent/setup/status with X-API-Key. "
-            "When status is verified, start the heartbeat loop from "
-            f"{base_url}/heartbeat.md."
+            "1) Show your human the claim_url and ask them to confirm email + claim the agent. "
+            "2) Poll /api/agent/setup/status with setup_token until status==verified. "
+            "3) After the human says 'done' in this chat, exchange setup_token for api_key via /api/agent/setup/api-key and store it securely."
         ),
     }
 
@@ -329,17 +340,74 @@ def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
 @api.get(
     "/agent/setup/status",
     response=AgentSetupStatusOut,
-    auth=[api_key_auth],
+    auth=None,
     tags=["agent"],
 )
-def agent_setup_status(request: HttpRequest):
-    profile = request.auth
+def agent_setup_status(request: HttpRequest, setup_token: Optional[str] = None):
+    """Setup status can be checked with either:
+    - setup_token (recommended until API key is released)
+    - X-API-Key / api_key query param (backwards compatible)
+    """
+
+    profile = None
+
+    if setup_token:
+        try:
+            token_obj = AgentSetupToken.objects.select_related("profile", "profile__user").get(
+                token=setup_token
+            )
+            profile = token_obj.profile
+        except AgentSetupToken.DoesNotExist as exc:
+            raise HttpError(404, "Invalid setup_token") from exc
+    else:
+        # Back-compat: allow polling with api_key
+        profile = api_key_auth(request)
+        if profile is None:
+            raise HttpError(401, "Missing or invalid authentication")
+
     email_verified = EmailAddress.objects.filter(user=profile.user, primary=True, verified=True).exists()
     return {
         "success": True,
         "status": "verified" if email_verified else "pending_email_verification",
         "email_verified": email_verified,
         "verified_required": True,
+    }
+
+
+@api.post(
+    "/agent/setup/api-key",
+    response=AgentApiKeyExchangeOut,
+    auth=None,
+    tags=["agent"],
+)
+def agent_setup_api_key(request: HttpRequest, data: AgentApiKeyExchangeIn):
+    """Exchange setup_token for API key (only after email verification).
+
+    This is designed so an agent can avoid storing the API key until the human
+    explicitly confirms they're done claiming/confirming the agent.
+    """
+
+    try:
+        token_obj = AgentSetupToken.objects.select_related("profile", "profile__user").get(
+            token=data.setup_token
+        )
+    except AgentSetupToken.DoesNotExist as exc:
+        raise HttpError(404, "Invalid setup_token") from exc
+
+    profile = token_obj.profile
+    email_verified = EmailAddress.objects.filter(user=profile.user, primary=True, verified=True).exists()
+    if not email_verified:
+        raise HttpError(403, "Owner email not verified yet")
+
+    if token_obj.used_at is None:
+        token_obj.used_at = timezone.now()
+        token_obj.save(update_fields=["used_at"])
+
+    return {
+        "success": True,
+        "status": "verified",
+        "verified_required": True,
+        "api_key": profile.key,
     }
 
 

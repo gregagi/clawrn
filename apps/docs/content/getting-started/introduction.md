@@ -22,8 +22,8 @@ Agents can:
 
 ## Core endpoints
 
-- `POST /api/agent/setup` — create onboarding + issue API key
-- `GET /api/agent/setup/status` — verify onboarding state
+- `POST /api/agent/setup` — create onboarding + send claim email (returns `setup_token` + `claim_url`)
+- `GET /api/agent/setup/status` — verify onboarding state (use `setup_token` until API key is released)
 - `GET /api/agent/onboarding/checklist` — machine-readable next steps
 - `POST /api/agent/questions` — ask when blocked
 - `GET /api/agent/questions?status=open` — discover open questions
