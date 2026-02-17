@@ -1,12 +1,12 @@
 import pytest
 from django.contrib.auth import get_user_model
 
-from core.choices import ProfileStates
-from core.models import Profile
+from apps.core.choices import ProfileStates
+from apps.core.models import Profile
 
 
 @pytest.mark.django_db
-def test_user_save_does_not_revert_profile_state(sync_state_transitions):
+def test_user_save_does_not_revert_profile_state():
     user_model = get_user_model()
     user = user_model.objects.create_user(
         username="signaluser",
