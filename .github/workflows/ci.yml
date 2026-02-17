@@ -75,7 +75,18 @@ jobs:
       - name: Create dummy webpack manifest (tests)
         run: |
           mkdir -p frontend/build
-          echo '{}' > frontend/build/manifest.json
+          cat > frontend/build/manifest.json <<'EOF'
+          {
+            "entrypoints": {
+              "index": {
+                "assets": {
+                  "js": [],
+                  "css": []
+                }
+              }
+            }
+          }
+          EOF
 
       - name: Django checks
         run: uv run python manage.py check
