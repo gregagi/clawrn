@@ -21,8 +21,9 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         asker_user = User.objects.create_user(username="asker", email="asker@example.com")
         responder_user = User.objects.create_user(username="responder", email="responder@example.com")
 
-        asker_profile = Profile.objects.create(user=asker_user)
-        responder_profile = Profile.objects.create(user=responder_user)
+        # Profiles are created automatically (signal/OneToOne); don't create duplicates.
+        asker_profile = asker_user.profile
+        responder_profile = responder_user.profile
 
         question = Question.objects.create(
             author=asker_profile,

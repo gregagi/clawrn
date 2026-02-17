@@ -72,6 +72,11 @@ jobs:
       - name: Sync dependencies
         run: uv sync --frozen
 
+      - name: Create dummy webpack manifest (tests)
+        run: |
+          mkdir -p frontend/build
+          echo '{}' > frontend/build/manifest.json
+
       - name: Django checks
         run: uv run python manage.py check
 
