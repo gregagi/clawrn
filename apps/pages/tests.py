@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 
@@ -77,3 +79,89 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("versioned:", response.content.decode())
         self.assertEqual(response["X-Clawrn-Docs-Channel"], "v1")
+
+    def test_skill_markdown_contract_required_sections_and_no_legacy_branding(self):
+        response = self.client.get("/skill.md")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        # Required headings/sections (keep this strict: agents follow this doc verbatim).
+        required_headings_in_order = [
+            "# Clawrn Skill",
+            "## One-line instruction for a user to give their OpenClaw agent",
+            "## Registration",
+            "## Verification gate",
+            "## API key release (after human says \"done\")",
+            "## Machine-readable onboarding checklist (after you have API key)",
+            "## Q&A loop",
+            "## Recommended cron jobs (run both)",
+            "## Heartbeat",
+        ]
+
+        last_index = -1
+        for heading in required_headings_in_order:
+            idx = content.find(heading)
+            self.assertNotEqual(
+                idx,
+                -1,
+                msg=f"Missing required heading in /skill.md: {heading}",
+            )
+            self.assertGreater(
+                idx,
+                last_index,
+                msg=f"Required heading out of order in /skill.md: {heading}",
+            )
+            last_index = idx
+
+        # Forbidden legacy branding / old names (keep list small and intentional).
+        forbidden_terms = [
+            "Clorn",
+        ]
+        for term in forbidden_terms:
+            self.assertNotIn(
+                term,
+                content,
+                msg=f"Found forbidden legacy branding term in /skill.md: {term}",
+            )
+
+        # Required frontmatter keys (rendered into the served markdown).
+        for key in ["name:", "version:", "description:", "homepage:", "canonical:", "versioned:"]:
+            self.assertRegex(
+                content,
+                rf"(?m)^\s*{re.escape(key)}",
+                msg=f"Missing required frontmatter key in /skill.md: {key}",
+            )
+
+    def test_heartbeat_markdown_contract_required_sections(self):
+        response = self.client.get("/heartbeat.md")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        required_headings_in_order = [
+            "# HEARTBEAT.md",
+            "## Clawrn (every 20 minutes)",
+            "## Quiet-mode rule",
+        ]
+
+        last_index = -1
+        for heading in required_headings_in_order:
+            idx = content.find(heading)
+            self.assertNotEqual(
+                idx,
+                -1,
+                msg=f"Missing required heading in /heartbeat.md: {heading}",
+            )
+            self.assertGreater(
+                idx,
+                last_index,
+                msg=f"Required heading out of order in /heartbeat.md: {heading}",
+            )
+            last_index = idx
+
+        # Required frontmatter keys.
+        for key in ["version:", "canonical:", "versioned:"]:
+            self.assertRegex(
+                content,
+                rf"(?m)^\s*{re.escape(key)}",
+                msg=f"Missing required frontmatter key in /heartbeat.md: {key}",
+            )
