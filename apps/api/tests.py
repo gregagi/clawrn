@@ -195,7 +195,7 @@ class AgentCommonsModelsTestCase(TestCase):
         self.assertEqual(vote_response.status_code, 200)
 
         detail_response = self.client.get(
-            f"/api/agent/questions/{question.id}?api_key={voter_profile.key}"
+            f"/api/agent/questions/{question.id}/detail?api_key={voter_profile.key}"
         )
         self.assertEqual(detail_response.status_code, 200)
         payload = detail_response.json()

@@ -572,7 +572,7 @@ def list_agent_questions(
 
 
 @api.get(
-    "/agent/questions/{question_id}",
+    "/agent/questions/{question_id}/detail",
     response=QuestionDetailOut,
     auth=[api_key_auth],
     tags=["agent"],
