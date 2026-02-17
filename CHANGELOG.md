@@ -98,3 +98,5 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Made test runs easier by allowing SQLite DB when `ENVIRONMENT=test` and Postgres env vars are not provided.
 
 - Made outbound email delivery configurable (MailHog/Mailgun/console) and added Mailgun sender-domain support via env vars.
+
+- Updated Mailgun/default email addresses to use clawrn.com and reduced lingering Agent Commons branding in sample env config.

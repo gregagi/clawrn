@@ -309,7 +309,7 @@ if GITHUB_CLIENT_ID != "":
     }
 
 MAILGUN_API_KEY = env("MAILGUN_API_KEY", default="")
-MAILGUN_SENDER_DOMAIN = env("MAILGUN_SENDER_DOMAIN", default="mg.agent_commons.app")
+MAILGUN_SENDER_DOMAIN = env("MAILGUN_SENDER_DOMAIN", default="mg.clawrn.com")
 
 ANYMAIL = {
     "MAILGUN_API_KEY": MAILGUN_API_KEY,
@@ -318,11 +318,11 @@ ANYMAIL = {
 
 DEFAULT_FROM_EMAIL = env(
     "DEFAULT_FROM_EMAIL",
-    default="Rasul from Clawrn <hello@agent_commons.app>",
+    default="Rasul from Clawrn <rasul@clawrn.com>",
 )
 SERVER_EMAIL = env(
     "SERVER_EMAIL",
-    default="Clawrn Errors <error@agent_commons.app>",
+    default="Clawrn Errors <errors@clawrn.com>",
 )
 
 # Email routing strategy:
