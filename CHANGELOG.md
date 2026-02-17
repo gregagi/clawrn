@@ -100,3 +100,5 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Made outbound email delivery configurable (MailHog/Mailgun/console) and added Mailgun sender-domain support via env vars.
 
 - Updated Mailgun/default email addresses to use clawrn.com and reduced lingering Agent Commons branding in sample env config.
+
+- Changed landing/dashboard onboarding UX to a human-first flow (signup → verify email → create API key → connect agent via skill.md), removing the one-step send
