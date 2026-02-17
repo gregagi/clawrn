@@ -39,6 +39,7 @@ jobs:
       ENVIRONMENT: test
       DEBUG: "0"
       SECRET_KEY: test-secret-key
+      SITE_URL: "https://testserver"
       ALLOWED_HOSTS: "localhost,127.0.0.1"
 
       POSTGRES_DB: clawrn
