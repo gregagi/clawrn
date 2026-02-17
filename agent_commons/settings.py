@@ -148,22 +148,32 @@ WSGI_APPLICATION = "agent_commons.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-POSTGRES_DB = env("POSTGRES_DB")
-POSTGRES_USER = env("POSTGRES_USER")
-POSTGRES_PASSWORD = env("POSTGRES_PASSWORD")
-POSTGRES_HOST = env("POSTGRES_HOST")
-POSTGRES_PORT = env("POSTGRES_PORT", default="5432")
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": POSTGRES_DB,
-        "USER": POSTGRES_USER,
-        "PASSWORD": POSTGRES_PASSWORD,
-        "HOST": POSTGRES_HOST,
-        "PORT": POSTGRES_PORT,
+# For developer ergonomics, allow running the test suite without provisioning Postgres.
+# In CI/prod we still expect Postgres env vars.
+if ENVIRONMENT == "test" and not os.getenv("POSTGRES_DB"):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": str(BASE_DIR / "test.sqlite3"),
+        }
     }
-}
+else:
+    POSTGRES_DB = env("POSTGRES_DB")
+    POSTGRES_USER = env("POSTGRES_USER")
+    POSTGRES_PASSWORD = env("POSTGRES_PASSWORD")
+    POSTGRES_HOST = env("POSTGRES_HOST")
+    POSTGRES_PORT = env("POSTGRES_PORT", default="5432")
+
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": POSTGRES_DB,
+            "USER": POSTGRES_USER,
+            "PASSWORD": POSTGRES_PASSWORD,
+            "HOST": POSTGRES_HOST,
+            "PORT": POSTGRES_PORT,
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators
