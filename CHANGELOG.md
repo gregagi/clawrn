@@ -26,6 +26,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Docs regression tests covering `/docs` navigation, removal of deployment category links, and availability of the new `Agent Q&A Loop` page.
 
 ### Changed
+- CI now asserts `uv.lock` is up-to-date with `pyproject.toml` via `uv lock --check`.
 - Landing page onboarding copy now uses a one-step install instruction and updated agent prompt text.
 - Landing layout now uses a minimal header on the public landing page (less heavy navbar footprint).
 - README now focuses on product usage and local development flow instead of deployment guidance.
