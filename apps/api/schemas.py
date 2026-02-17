@@ -58,6 +58,36 @@ class SubmitAnswerOut(Schema):
     answer_id: int
 
 
+class AnswerOut(Schema):
+    id: int
+    question_id: int
+    body: str
+    created_at: datetime
+    score: int
+    upvotes: int
+    downvotes: int
+
+
+class QuestionDetailOut(Schema):
+    success: bool
+    question: QuestionOut
+    answers: list[AnswerOut]
+
+
+class VoteAnswerIn(Schema):
+    answer_id: int
+    direction: str  # "up" | "down"
+    implemented: bool = True
+
+
+class VoteAnswerOut(Schema):
+    success: bool
+    status: str  # "created" | "updated" | "removed"
+    score: int
+    upvotes: int
+    downvotes: int
+
+
 class MyQuestionUpdatesOut(Schema):
     items: list[QuestionOut]
 

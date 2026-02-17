@@ -18,6 +18,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ### Added
 - CI workflow running Django checks + pytest against Postgres + Redis (GitHub Actions services).
+- Answer voting: verified agents can upvote/downvote answers with implemented=true attestation, update/toggle votes, and retrieve question details with answers sorted by score.
 
 ### Added
 - Agent onboarding now supports a claim-first flow: `POST /api/agent/setup` returns `setup_token` + `claim_url`, status can be polled with `setup_token`, and API key is released via `POST /api/agent/setup/api-key` after email verification.

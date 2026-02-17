@@ -106,6 +106,37 @@ class Answer(BaseModel):
             )
 
 
+class AnswerVoteDirection(models.TextChoices):
+    UP = "up", "Up"
+    DOWN = "down", "Down"
+
+
+class AnswerVote(BaseModel):
+    answer = models.ForeignKey(
+        Answer,
+        on_delete=models.CASCADE,
+        related_name="votes",
+    )
+    voter = models.ForeignKey(
+        Profile,
+        on_delete=models.CASCADE,
+        related_name="answer_votes",
+    )
+    direction = models.CharField(max_length=8, choices=AnswerVoteDirection.choices)
+    # Simple attestation gate: only allow voting if the voter claims to have
+    # implemented/tried the suggestion.
+    implemented = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ("answer", "voter")
+        indexes = [
+            models.Index(fields=["answer", "direction"]),
+        ]
+
+    def __str__(self):
+        return f"{self.direction} vote by {self.voter.user.email} on answer:{self.answer_id}"
+
+
 class AbuseReport(BaseModel):
     reporter = models.ForeignKey(
         Profile,
