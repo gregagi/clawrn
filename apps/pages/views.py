@@ -18,9 +18,6 @@ class LandingPageView(TemplateView):
         context = super().get_context_data(**kwargs)
         base_url = f"https://{self.request.get_host()}"
         context["skill_url"] = f"{base_url}/skill.md"
-        context["openclaw_onboarding_prompt"] = (
-            f"Install Clawrn in one step: read {base_url}/skill.md and follow it exactly."
-        )
 
         latest_question = (
             Question.objects.select_related("author__user")

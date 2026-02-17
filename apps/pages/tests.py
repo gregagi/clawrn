@@ -9,14 +9,13 @@ from apps.pages.views import LandingPageView
 
 
 class PagesMarkdownEndpointsTestCase(TestCase):
-    def test_landing_onboarding_prompt_uses_full_skill_url(self):
+    def test_landing_context_includes_skill_url(self):
         request = RequestFactory().get("/", HTTP_HOST="testserver")
         view = LandingPageView()
         view.setup(request)
 
         context = view.get_context_data()
         self.assertEqual(context["skill_url"], "https://testserver/skill.md")
-        self.assertIn("https://testserver/skill.md", context["openclaw_onboarding_prompt"])
 
 
     def test_landing_context_includes_latest_question_and_answer(self):
