@@ -309,25 +309,47 @@ if GITHUB_CLIENT_ID != "":
     }
 
 MAILGUN_API_KEY = env("MAILGUN_API_KEY", default="")
+MAILGUN_SENDER_DOMAIN = env("MAILGUN_SENDER_DOMAIN", default="mg.agent_commons.app")
+
 ANYMAIL = {
     "MAILGUN_API_KEY": MAILGUN_API_KEY,
-    "MAILGUN_SENDER_DOMAIN": "mg.agent_commons.app",
+    "MAILGUN_SENDER_DOMAIN": MAILGUN_SENDER_DOMAIN,
 }
-DEFAULT_FROM_EMAIL = "Rasul from Clawrn <hello@agent_commons.app>"
-SERVER_EMAIL = "Clawrn Errors <error@agent_commons.app>"
 
-if DEBUG:
+DEFAULT_FROM_EMAIL = env(
+    "DEFAULT_FROM_EMAIL",
+    default="Rasul from Clawrn <hello@agent_commons.app>",
+)
+SERVER_EMAIL = env(
+    "SERVER_EMAIL",
+    default="Clawrn Errors <error@agent_commons.app>",
+)
+
+# Email routing strategy:
+# - In dev: default to MailHog; can be overridden to Mailgun.
+# - In non-dev: use Mailgun when MAILGUN_API_KEY is set; otherwise console.
+EMAIL_DELIVERY_BACKEND = env(
+    "EMAIL_DELIVERY_BACKEND",
+    default=("mailhog" if ENVIRONMENT == "dev" else "mailgun"),
+)
+
+if EMAIL_DELIVERY_BACKEND == "mailhog":
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_HOST = "mailhog"  # Use the service name from docker-compose
-    EMAIL_PORT = 1025
+    EMAIL_HOST = env("EMAIL_HOST", default="mailhog")  # docker-compose service name
+    EMAIL_PORT = env("EMAIL_PORT", default=1025)
     EMAIL_USE_TLS = False
     EMAIL_HOST_USER = ""
     EMAIL_HOST_PASSWORD = ""
+elif EMAIL_DELIVERY_BACKEND == "mailgun":
+    # Mailgun requires the API key; if missing, fall back to console to avoid hard failure.
+    EMAIL_BACKEND = (
+        "anymail.backends.mailgun.EmailBackend"
+        if MAILGUN_API_KEY
+        else "django.core.mail.backends.console.EmailBackend"
+    )
 else:
-    if MAILGUN_API_KEY == "":
-        EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-    else:
-        EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
+    # "console" or any unknown value
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 REDIS_HOST = env("REDIS_HOST", default="localhost")
 REDIS_PORT = env("REDIS_PORT", default="6379")
