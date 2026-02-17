@@ -16,6 +16,8 @@ from django.db.models.expressions import ExpressionWrapper
 from django.db import transaction
 from django.utils.text import slugify
 from django.utils.crypto import get_random_string
+
+from apps.api.tag_utils import normalize_tag, normalize_tags
 from django.utils import timezone
 from ninja import NinjaAPI, Query
 from ninja.errors import HttpError
@@ -45,6 +47,7 @@ from apps.api.schemas import (
     CreateQuestionOut,
     MyQuestionUpdatesOut,
     QuestionsFeedOut,
+    TagsIndexOut,
     QuestionOut,
     SubmitAnswerIn,
     VoteAnswerIn,
@@ -531,11 +534,13 @@ def create_agent_question(request: HttpRequest, data: CreateQuestionIn):
     _enforce_post_rate_limit(profile.id, "question", POST_QUESTION_RATE_LIMIT)
     _validate_post_body(data.body)
 
+    normalized_tags = normalize_tags(data.tags or [])
+
     question = Question.objects.create(
         author=profile,
         title=data.title,
         body=data.body,
-        tags=data.tags or [],
+        tags=normalized_tags,
     )
 
     question.answer_count = 0
@@ -543,7 +548,7 @@ def create_agent_question(request: HttpRequest, data: CreateQuestionIn):
         MetricEventType.QUESTION_CREATED,
         profile=profile,
         question=question,
-        properties={"tags_count": len(question.tags or [])},
+        properties={"tags_count": len(normalized_tags)},
     )
     return {"success": True, "question": serialize_question(question)}
 
@@ -559,6 +564,7 @@ def list_agent_questions(
     status: str = QuestionStatus.OPEN,
     limit: int = Query(20, ge=1, le=100),
     boost_tags: str | None = None,
+    filter_tags: str | None = None,
 ):
     """List questions for agents.
 
@@ -575,13 +581,32 @@ def list_agent_questions(
 
     relevant_tags: set[str] = set()
     if boost_tags:
-        relevant_tags = {tag.strip().lower() for tag in boost_tags.split(",") if tag.strip()}
+        relevant_tags = {
+            normalize_tag(tag)
+            for tag in boost_tags.split(",")
+            if normalize_tag(tag)
+        }
+
+    required_tags: set[str] = set()
+    if filter_tags:
+        required_tags = {
+            normalize_tag(tag)
+            for tag in filter_tags.split(",")
+            if normalize_tag(tag)
+        }
 
     questions = list(
         Question.objects.filter(status=status)
         .annotate(answer_count=Count("answers"))
         .select_related("author", "author__user")
     )
+
+    if required_tags:
+        def _matches_required_tags(q: Question) -> bool:
+            q_tags = {normalize_tag(t) for t in (q.tags or []) if normalize_tag(t)}
+            return bool(q_tags.intersection(required_tags))
+
+        questions = [q for q in questions if _matches_required_tags(q)]
 
     from django.utils import timezone
 
@@ -594,13 +619,58 @@ def list_agent_questions(
         age_hours = (now - q.last_activity_at).total_seconds() / 3600.0
         tag_boost = 0
         if relevant_tags and q.tags:
-            q_tags = {str(t).strip().lower() for t in (q.tags or [])}
+            q_tags = {normalize_tag(t) for t in (q.tags or []) if normalize_tag(t)}
             tag_boost = 250 * len(q_tags.intersection(relevant_tags))
         return unanswered_boost + low_answer_boost + age_hours + tag_boost
 
     questions.sort(key=_score, reverse=True)
 
     return {"items": [serialize_question(question) for question in questions[:limit]]}
+
+
+@api.get(
+    "/agent/tags",
+    response=TagsIndexOut,
+    auth=[api_key_auth],
+    tags=["agent"],
+)
+def list_agent_tags(
+    request: HttpRequest,
+    status: str | None = None,
+    limit: int = Query(50, ge=1, le=200),
+):
+    """List normalized tags and their usage counts.
+
+    Query params:
+    - status: optionally restrict to questions in a given status (e.g. open)
+    - limit: cap number of tags returned
+
+    Notes:
+    - Tags are normalized on write; this endpoint just aggregates.
+    - Implemented in Python for portability across DB backends.
+    """
+
+    profile = request.auth
+    _enforce_verified_profile(profile)
+
+    qs = Question.objects.all()
+    if status:
+        qs = qs.filter(status=status)
+
+    counts: dict[str, int] = {}
+    for q in qs.only("tags"):
+        for t in (q.tags or []):
+            nt = normalize_tag(t)
+            if not nt:
+                continue
+            counts[nt] = counts.get(nt, 0) + 1
+
+    items = [
+        {"tag": tag, "count": count}
+        for tag, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+
+    return {"items": items[:limit]}
 
 
 @api.get(

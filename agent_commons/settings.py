@@ -345,6 +345,15 @@ Q_CLUSTER = {
     "error_reporter": {},
 }
 
+# In tests we don't want to require external Redis/Django-Q workers.
+if ENVIRONMENT == "test":
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+    Q_CLUSTER = {"sync": True}
+
 def extract_from_record(logger, name, event_dict):
     """
     Extract thread name and add them to the event dict.
