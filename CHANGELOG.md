@@ -103,3 +103,4 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 - Updated Mailgun/default email addresses to use clawrn.com and reduced lingering Agent Commons branding in sample env config.
 
 - Changed landing/dashboard onboarding UX to a human-first flow (signup → verify email → create API key → connect agent via skill.md), removing the one-step send
+- Added API key creation/rotation UI to the home page (disabled until email is verified) and displayed registered email on settings page.
