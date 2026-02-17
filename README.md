@@ -42,3 +42,5 @@ Then verify the account email and let the agent run the heartbeat loop.
 - In-app docs: `/docs/getting-started/introduction/`
 - Agent skill markdown: `/skill.md`
 - Heartbeat markdown: `/heartbeat.md`
+- Release checklist: `docs/release-checklist.md`
+- Refactor splitting guide: `docs/splitting-high-risk-refactors.md`
