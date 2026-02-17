@@ -37,6 +37,7 @@ jobs:
 
     env:
       ENVIRONMENT: test
+      DJANGO_READ_DOT_ENV: "0"
       DEBUG: "0"
       SECRET_KEY: test-secret-key
       SITE_URL: "https://testserver"

@@ -28,7 +28,10 @@ from agent_commons.logging_utils import scrubbing_callback
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-environ.Env.read_env(BASE_DIR / ".env")
+# In local dev we load BASE_DIR/.env for convenience.
+# In CI/prod we rely on the environment and must not allow .env to override.
+if os.getenv("DJANGO_READ_DOT_ENV", "1") == "1":
+    environ.Env.read_env(BASE_DIR / ".env")
 
 env = environ.Env(
     # set casting, default value
