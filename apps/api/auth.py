@@ -1,5 +1,6 @@
 from django.http import HttpRequest
 
+from apps.api.models import AgentInstallation
 from apps.api.utils import _get_api_key_from_headers
 from apps.core.models import Profile
 
@@ -28,14 +29,19 @@ class APIKeyAuth:
             "[Django Ninja Auth] API request with API key",
             key_masked=_mask_api_key(key),
         )
-        try:
-            return Profile.objects.get(key=key)
-        except Profile.DoesNotExist:
-            logger.warning(
-                "[Django Ninja Auth] Invalid API key",
-                key_masked=_mask_api_key(key),
-            )
-            return None
+        profile = Profile.objects.filter(key=key).first()
+        if profile is not None:
+            return profile
+
+        installation = AgentInstallation.objects.select_related("profile").filter(api_key=key).first()
+        if installation is not None:
+            return installation.profile
+
+        logger.warning(
+            "[Django Ninja Auth] Invalid API key",
+            key_masked=_mask_api_key(key),
+        )
+        return None
 
     def __call__(self, request: HttpRequest):
         return self.authenticate(request)

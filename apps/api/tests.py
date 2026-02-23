@@ -538,33 +538,85 @@ class AgentCommonsModelsTestCase(TestCase):
 
         created_user = User.objects.get(email="new-owner@example.com")
         self.assertTrue(created_user.profile.key)
-        self.assertTrue(
-            AgentInstallation.objects.filter(
-                profile=created_user.profile,
-                agent_name="Forge",
-                platform="openclaw",
-            ).exists()
+        installation = AgentInstallation.objects.get(
+            profile=created_user.profile,
+            agent_name="Forge",
+            platform="openclaw",
         )
+        self.assertTrue(installation.api_key)
         self.assertTrue(
             MetricEvent.objects.filter(
                 event_type=MetricEventType.ACCOUNT_CREATED,
                 profile=created_user.profile,
             ).exists()
         )
+        self.assertTrue(
+            AgentSetupToken.objects.filter(
+                token=payload["setup_token"],
+                installation=installation,
+                profile=created_user.profile,
+            ).exists()
+        )
 
-    def test_agent_setup_rejects_duplicate_email(self):
-        response = self.client.post(
+    def test_agent_setup_allows_multiple_agents_for_same_owner_email(self):
+        first = self.client.post(
             "/api/agent/setup",
             data=json.dumps(
                 {
                     "owner_email": self.user.email,
-                    "agent_name": "AnotherForge",
+                    "agent_name": "ForgeOne",
+                    "platform": "openclaw",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(first.status_code, 200)
+
+        second = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": self.user.email,
+                    "agent_name": "ForgeTwo",
+                    "platform": "openclaw",
                 }
             ),
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 409)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(
+            AgentInstallation.objects.filter(profile=self.profile, platform="openclaw").count(),
+            2,
+        )
+
+    def test_agent_setup_rejects_duplicate_agent_name_and_platform_for_same_owner(self):
+        first = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": self.user.email,
+                    "agent_name": "ForgeDup",
+                    "platform": "openclaw",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(first.status_code, 200)
+
+        second = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": self.user.email,
+                    "agent_name": "ForgeDup",
+                    "platform": "openclaw",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(second.status_code, 409)
+        self.assertIn("agent_name and platform", second.json()["detail"])
 
     @patch("apps.api.views.SETUP_RATE_LIMIT_PER_IP", 1)
     def test_agent_setup_rate_limits_by_ip(self):
@@ -720,6 +772,62 @@ class AgentCommonsModelsTestCase(TestCase):
             content_type="application/json",
         )
         self.assertEqual(second_exchange.status_code, 410)
+
+    def test_api_key_exchange_returns_distinct_agent_keys_and_both_keys_authenticate(self):
+        first_setup = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": "multi-owner@example.com",
+                    "agent_name": "ForgeAlpha",
+                    "platform": "openclaw",
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="203.0.113.41",
+        )
+        self.assertEqual(first_setup.status_code, 200)
+
+        second_setup = self.client.post(
+            "/api/agent/setup",
+            data=json.dumps(
+                {
+                    "owner_email": "multi-owner@example.com",
+                    "agent_name": "ForgeBeta",
+                    "platform": "openclaw",
+                }
+            ),
+            content_type="application/json",
+            REMOTE_ADDR="203.0.113.42",
+        )
+        self.assertEqual(second_setup.status_code, 200)
+
+        owner = User.objects.get(email="multi-owner@example.com")
+        owner.emailaddress_set.filter(primary=True).update(verified=True)
+
+        first_key_response = self.client.post(
+            "/api/agent/setup/api-key",
+            data=json.dumps({"setup_token": first_setup.json()["setup_token"]}),
+            content_type="application/json",
+        )
+        self.assertEqual(first_key_response.status_code, 200)
+        first_key = first_key_response.json()["api_key"]
+
+        second_key_response = self.client.post(
+            "/api/agent/setup/api-key",
+            data=json.dumps({"setup_token": second_setup.json()["setup_token"]}),
+            content_type="application/json",
+        )
+        self.assertEqual(second_key_response.status_code, 200)
+        second_key = second_key_response.json()["api_key"]
+
+        self.assertNotEqual(first_key, second_key)
+
+        first_auth_response = self.client.get(f"/api/agent/questions?api_key={first_key}&limit=10")
+        self.assertEqual(first_auth_response.status_code, 200)
+
+        second_auth_response = self.client.get(f"/api/agent/questions?api_key={second_key}&limit=10")
+        self.assertEqual(second_auth_response.status_code, 200)
 
     def test_setup_status_rejects_used_setup_token(self):
         setup_response = self.client.post(
