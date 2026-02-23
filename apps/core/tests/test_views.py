@@ -1,6 +1,9 @@
 import pytest
 from allauth.account.models import EmailAddress
+from django.contrib.auth.models import User
 from django.urls import reverse
+
+from apps.api.models import AgentInstallation
 
 
 @pytest.mark.django_db
@@ -23,6 +26,19 @@ class TestHomeView:
 
         assert response.context["email_verified"] is False
         assert response.context["api_key"]
+
+    def test_home_view_context_includes_agent_installations(self, auth_client, user):
+        installation = AgentInstallation.objects.create(
+            profile=user.profile,
+            agent_name="Forge",
+            platform="openclaw",
+        )
+
+        url = reverse("home")
+        response = auth_client.get(url)
+
+        assert "agent_installations" in response.context
+        assert installation in response.context["agent_installations"]
 
 
 @pytest.mark.django_db
@@ -48,3 +64,91 @@ class TestApiKeyRotation:
         user.profile.refresh_from_db()
         assert user.profile.key != old_key
         assert response.status_code == 200
+
+
+@pytest.mark.django_db
+class TestAgentInstallationDashboard:
+    def test_create_agent_installation_succeeds_when_email_verified(self, auth_client, user):
+        EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
+
+        response = auth_client.post(
+            reverse("create_agent_installation"),
+            {
+                "agent_name": "Forge",
+                "platform": "openclaw",
+                "agent_version": "v1",
+            },
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        installation = AgentInstallation.objects.get(profile=user.profile, agent_name="Forge", platform="openclaw")
+        assert installation.agent_version == "v1"
+
+    def test_create_agent_installation_blocked_when_email_not_verified(self, auth_client, user):
+        EmailAddress.objects.create(user=user, email=user.email, verified=False, primary=True)
+
+        response = auth_client.post(
+            reverse("create_agent_installation"),
+            {"agent_name": "Forge", "platform": "openclaw"},
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        assert not AgentInstallation.objects.filter(profile=user.profile).exists()
+
+    def test_create_agent_installation_rejects_duplicate_name_platform_for_owner(self, auth_client, user):
+        EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
+        AgentInstallation.objects.create(
+            profile=user.profile,
+            agent_name="Forge",
+            platform="openclaw",
+        )
+
+        response = auth_client.post(
+            reverse("create_agent_installation"),
+            {"agent_name": "Forge", "platform": "openclaw"},
+            follow=True,
+        )
+
+        assert response.status_code == 200
+        assert AgentInstallation.objects.filter(profile=user.profile, agent_name="Forge", platform="openclaw").count() == 1
+
+
+@pytest.mark.django_db
+class TestAgentInstallationSettings:
+    def test_agent_settings_shows_key_and_prompt_for_owner(self, auth_client, user):
+        installation = AgentInstallation.objects.create(
+            profile=user.profile,
+            agent_name="Forge",
+            platform="openclaw",
+        )
+
+        response = auth_client.get(
+            reverse("agent_installation_settings", kwargs={"installation_id": installation.id})
+        )
+
+        assert response.status_code == 200
+        assert response.context["installation"] == installation
+        assert installation.api_key in response.content.decode()
+        assert "/skill.md" in response.content.decode()
+        assert "heartbeat" in response.content.decode().lower()
+
+    def test_agent_settings_denies_access_for_non_owner(self, client, user):
+        other_user = User.objects.create_user(
+            username="otheruser",
+            email="other@example.com",
+            password="password123",
+        )
+        client.force_login(other_user)
+        installation = AgentInstallation.objects.create(
+            profile=user.profile,
+            agent_name="Forge",
+            platform="openclaw",
+        )
+
+        response = client.get(
+            reverse("agent_installation_settings", kwargs={"installation_id": installation.id})
+        )
+
+        assert response.status_code == 404

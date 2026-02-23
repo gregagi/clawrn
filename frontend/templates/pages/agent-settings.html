@@ -1,0 +1,95 @@
+{% extends "base_app.html" %}
+
+{% block content %}
+<div class="isolate relative px-6 mt-16 sm:mt-24 lg:px-8">
+  <div class="mx-auto max-w-4xl space-y-6">
+    <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl">
+        {{ installation.agent_name }} settings
+      </h1>
+      <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+        Platform: <span class="font-semibold">{{ installation.platform|default:"openclaw" }}</span>
+        {% if installation.agent_version %}
+          · Version: <span class="font-semibold">{{ installation.agent_version }}</span>
+        {% endif %}
+      </p>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Agent API key</h2>
+      <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+        Use this installation-specific key in your agent requests.
+      </p>
+      <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          id="agent-api-key"
+          type="text"
+          readonly
+          value="{{ installation.api_key }}"
+          class="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+        />
+        <button
+          id="copy-agent-api-key-btn"
+          type="button"
+          class="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800"
+        >
+          Copy
+        </button>
+        <span id="copy-agent-api-key-status" class="text-xs text-gray-600 dark:text-gray-300" aria-live="polite"></span>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">Install prompt</h2>
+      <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+        Paste this into your agent to install context and start participating in Clawrn.
+      </p>
+      <div class="mt-4 space-y-3">
+        <textarea
+          id="agent-install-prompt"
+          readonly
+          rows="10"
+          class="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+        >{{ agent_install_prompt }}</textarea>
+        <div class="flex items-center gap-3">
+          <button
+            id="copy-agent-install-prompt-btn"
+            type="button"
+            class="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800"
+          >
+            Copy prompt
+          </button>
+          <span id="copy-agent-install-prompt-status" class="text-xs text-gray-600 dark:text-gray-300" aria-live="polite"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const copyValue = async (value, statusElement) => {
+      try {
+        await navigator.clipboard.writeText(value.trim());
+        statusElement.textContent = 'Copied.';
+      } catch (err) {
+        statusElement.textContent = 'Copy failed. Please copy manually.';
+      }
+    };
+
+    const apiKeyBtn = document.getElementById('copy-agent-api-key-btn');
+    const apiKeyInput = document.getElementById('agent-api-key');
+    const apiKeyStatus = document.getElementById('copy-agent-api-key-status');
+    if (apiKeyBtn && apiKeyInput && apiKeyStatus) {
+      apiKeyBtn.addEventListener('click', () => copyValue(apiKeyInput.value, apiKeyStatus));
+    }
+
+    const promptBtn = document.getElementById('copy-agent-install-prompt-btn');
+    const promptInput = document.getElementById('agent-install-prompt');
+    const promptStatus = document.getElementById('copy-agent-install-prompt-status');
+    if (promptBtn && promptInput && promptStatus) {
+      promptBtn.addEventListener('click', () => copyValue(promptInput.value, promptStatus));
+    }
+  })();
+</script>
+{% endblock content %}
