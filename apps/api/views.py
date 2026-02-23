@@ -7,7 +7,7 @@ from django.urls import reverse
 from allauth.account.models import EmailAddress, EmailConfirmation
 from django.contrib.auth.models import User
 from django.http import HttpRequest
-from django.db import connection
+from django.db import connection, IntegrityError
 from django.core.cache import cache
 from django.db.models import Count, Min
 from django.db.models import Q, Sum
@@ -35,7 +35,7 @@ from apps.api.models import (
     Question,
     QuestionStatus,
 )
-from apps.core.models import Feedback
+from apps.core.models import Feedback, Profile
 from apps.api.schemas import (
     AgentOnboardingIn,
     AgentOnboardingOut,
@@ -396,6 +396,7 @@ def generate_unique_username(agent_name: str) -> str:
 )
 def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
     email = data.owner_email.strip().lower()
+    platform = data.platform or "openclaw"
     ip_address = _request_ip(request)
 
     ip_key = _rate_limit_cache_key("ip", ip_address)
@@ -408,41 +409,68 @@ def agent_setup(request: HttpRequest, data: AgentOnboardingIn):
         logger.warning("Agent setup rate limited by email", email=email)
         raise HttpError(429, "Too many setup attempts for this email. Please try again later.")
 
-    if User.objects.filter(email=email).exists():
-        raise HttpError(409, "An account with this email already exists. Please sign in.")
+    with transaction.atomic():
+        user = User.objects.filter(email=email).first()
+        created_user = False
+        if user is None:
+            username = generate_unique_username(data.agent_name)
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=get_random_string(32),
+            )
+            created_user = True
 
-    username = generate_unique_username(data.agent_name)
-    user = User.objects.create_user(
-        username=username,
-        email=email,
-        password=get_random_string(32),
-    )
+        profile, _ = Profile.objects.get_or_create(user=user)
 
-    profile = user.profile
-    AgentInstallation.objects.create(
-        profile=profile,
-        agent_name=data.agent_name,
-        platform=data.platform or "openclaw",
-        agent_version=data.agent_version or "",
-        capabilities=data.capabilities or [],
-    )
+        if AgentInstallation.objects.filter(
+            profile=profile,
+            agent_name=data.agent_name,
+            platform=platform,
+        ).exists():
+            raise HttpError(
+                409,
+                "An agent installation with this agent_name and platform already exists for this owner_email.",
+            )
+
+        try:
+            installation = AgentInstallation.objects.create(
+                profile=profile,
+                agent_name=data.agent_name,
+                platform=platform,
+                agent_version=data.agent_version or "",
+                capabilities=data.capabilities or [],
+            )
+        except IntegrityError as exc:
+            raise HttpError(
+                409,
+                "An agent installation with this agent_name and platform already exists for this owner_email.",
+            ) from exc
 
     email_address, _ = EmailAddress.objects.get_or_create(
         user=user,
         email=email,
         defaults={"primary": True, "verified": False},
     )
+    if not email_address.primary:
+        email_address.primary = True
+        email_address.save(update_fields=["primary"])
 
     email_confirmation = EmailConfirmation.create(email_address)
     email_confirmation.send(request, signup=True)
 
-    setup_token = AgentSetupToken.objects.create(profile=profile, token=uuid4())
-
-    _record_metric_event(
-        MetricEventType.ACCOUNT_CREATED,
+    setup_token = AgentSetupToken.objects.create(
         profile=profile,
-        properties={"platform": data.platform or "openclaw"},
+        installation=installation,
+        token=uuid4(),
     )
+
+    if created_user:
+        _record_metric_event(
+            MetricEventType.ACCOUNT_CREATED,
+            profile=profile,
+            properties={"platform": platform},
+        )
 
     base_url = f"https://{request.get_host()}"
     claim_path = reverse("account_confirm_email", args=[email_confirmation.key])
@@ -480,7 +508,13 @@ def agent_setup_status(request: HttpRequest, setup_token: Optional[str] = None):
 
     if setup_token:
         try:
-            token_obj = AgentSetupToken.objects.select_related("profile", "profile__user").get(
+            token_obj = AgentSetupToken.objects.select_related(
+                "installation",
+                "installation__profile",
+                "installation__profile__user",
+                "profile",
+                "profile__user",
+            ).get(
                 token=setup_token
             )
         except AgentSetupToken.DoesNotExist as exc:
@@ -492,7 +526,7 @@ def agent_setup_status(request: HttpRequest, setup_token: Optional[str] = None):
         if _setup_token_is_expired(token_obj):
             raise HttpError(410, "setup_token expired. Re-run /api/agent/setup to generate a new token.")
 
-        profile = token_obj.profile
+        profile = token_obj.installation.profile if token_obj.installation_id else token_obj.profile
     else:
         # Back-compat: allow polling with api_key
         profile = api_key_auth(request)
@@ -522,7 +556,13 @@ def agent_setup_api_key(request: HttpRequest, data: AgentApiKeyExchangeIn):
     """
 
     try:
-        token_obj = AgentSetupToken.objects.select_related("profile", "profile__user").get(
+        token_obj = AgentSetupToken.objects.select_related(
+            "installation",
+            "installation__profile",
+            "installation__profile__user",
+            "profile",
+            "profile__user",
+        ).get(
             token=data.setup_token
         )
     except AgentSetupToken.DoesNotExist as exc:
@@ -534,7 +574,7 @@ def agent_setup_api_key(request: HttpRequest, data: AgentApiKeyExchangeIn):
     if _setup_token_is_expired(token_obj):
         raise HttpError(410, "setup_token expired. Re-run /api/agent/setup to generate a new token.")
 
-    profile = token_obj.profile
+    profile = token_obj.installation.profile if token_obj.installation_id else token_obj.profile
     email_verified = EmailAddress.objects.filter(user=profile.user, primary=True, verified=True).exists()
     if not email_verified:
         raise HttpError(403, "Owner email not verified yet. Ask the owner to click the claim_url, then try again.")
@@ -546,7 +586,7 @@ def agent_setup_api_key(request: HttpRequest, data: AgentApiKeyExchangeIn):
         "success": True,
         "status": "verified",
         "verified_required": True,
-        "api_key": profile.key,
+        "api_key": token_obj.installation.api_key if token_obj.installation_id else profile.key,
     }
 
 

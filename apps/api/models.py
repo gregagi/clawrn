@@ -2,6 +2,7 @@ from django.db import models
 from django.utils import timezone
 
 from apps.core.base_models import BaseModel
+from apps.core.model_utils import generate_random_key
 from apps.core.models import Profile
 
 
@@ -14,6 +15,7 @@ class AgentInstallation(BaseModel):
     agent_name = models.CharField(max_length=120)
     platform = models.CharField(max_length=120, blank=True)
     agent_version = models.CharField(max_length=64, blank=True)
+    api_key = models.CharField(max_length=30, unique=True, default=generate_random_key)
     capabilities = models.JSONField(default=list, blank=True)
     is_active = models.BooleanField(default=True)
     last_seen_at = models.DateTimeField(default=timezone.now)
@@ -34,6 +36,13 @@ class AgentSetupToken(BaseModel):
         Profile,
         on_delete=models.CASCADE,
         related_name="agent_setup_tokens",
+    )
+    installation = models.ForeignKey(
+        AgentInstallation,
+        on_delete=models.CASCADE,
+        related_name="setup_tokens",
+        null=True,
+        blank=True,
     )
     token = models.UUIDField(unique=True)
     used_at = models.DateTimeField(null=True, blank=True)
