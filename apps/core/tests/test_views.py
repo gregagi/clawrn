@@ -15,14 +15,24 @@ class TestHomeView:
         response = auth_client.get(url)
         assert "pages/home.html" in [t.name for t in response.templates]
 
-    def test_home_view_context_includes_email_verified_and_api_key(self, auth_client, user):
+    def test_home_view_context_includes_email_verified_without_api_key(self, auth_client, user):
         EmailAddress.objects.create(user=user, email=user.email, verified=False, primary=True)
 
         url = reverse("home")
         response = auth_client.get(url)
 
         assert response.context["email_verified"] is False
-        assert response.context["api_key"]
+        assert "api_key" not in response.context
+
+    def test_home_view_does_not_render_api_key_for_verified_user(self, auth_client, user):
+        EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
+
+        url = reverse("home")
+        response = auth_client.get(url)
+
+        content = response.content.decode("utf-8")
+        assert user.profile.key not in content
+        assert "api-key-value" not in content
 
 
 @pytest.mark.django_db

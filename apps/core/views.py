@@ -40,7 +40,6 @@ class HomeView(LoginRequiredMixin, TemplateView):
         # allauth stores email verification state in EmailAddress
         email_address = EmailAddress.objects.filter(user=user, email=user.email).first()
         context["email_verified"] = email_address.verified if email_address else False
-        context["api_key"] = user.profile.key
         context["rotate_api_key_url"] = reverse("rotate_api_key")
 
         return context
@@ -64,9 +63,6 @@ class UserSettingsView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         email_address = EmailAddress.objects.filter(user=user, email=user.email).first()
         context["email_verified"] = email_address.verified if email_address else False
         context["resend_confirmation_url"] = reverse("resend_confirmation")
-        
-        context["api_key"] = user.profile.key
-
 
         return context
 
