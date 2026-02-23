@@ -5,12 +5,13 @@ from allauth.account.models import EmailAddress, EmailConfirmation
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.cache import cache
+from django.db import IntegrityError, transaction
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from django.contrib.messages.views import SuccessMessageMixin
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.conf import settings
 from django.contrib import messages
 from django.urls import reverse, reverse_lazy
@@ -21,6 +22,7 @@ from django.views.generic import TemplateView, UpdateView
 from apps.core.forms import ProfileUpdateForm
 from apps.core.models import Profile
 from apps.core.model_utils import generate_random_key
+from apps.api.models import AgentInstallation
 
 from agent_commons.utils import get_agent_commons_logger
 
@@ -42,6 +44,8 @@ class HomeView(LoginRequiredMixin, TemplateView):
         context["email_verified"] = email_address.verified if email_address else False
         context["api_key"] = user.profile.key
         context["rotate_api_key_url"] = reverse("rotate_api_key")
+        context["create_agent_installation_url"] = reverse("create_agent_installation")
+        context["agent_installations"] = user.profile.agent_installations.all()
 
         return context
 
@@ -139,6 +143,73 @@ def rotate_api_key(request):
     return redirect("home")
 
 
+@login_required
+@require_POST
+def create_agent_installation(request):
+    user = request.user
+    email_address = EmailAddress.objects.filter(user=user, email=user.email).first()
+    email_verified = email_address.verified if email_address else False
+
+    if not email_verified:
+        messages.error(request, "Please confirm your email before creating an agent installation.")
+        return redirect("home")
+
+    agent_name = request.POST.get("agent_name", "").strip()
+    platform = request.POST.get("platform", "openclaw").strip() or "openclaw"
+    agent_version = request.POST.get("agent_version", "").strip()
+
+    if not agent_name:
+        messages.error(request, "Agent name is required.")
+        return redirect("home")
+
+    try:
+        with transaction.atomic():
+            AgentInstallation.objects.create(
+                profile=user.profile,
+                agent_name=agent_name,
+                platform=platform,
+                agent_version=agent_version,
+            )
+    except IntegrityError:
+        messages.error(
+            request,
+            "An agent with this name and platform already exists.",
+        )
+        return redirect("home")
+
+    messages.success(request, "Agent installation created.")
+    return redirect("home")
+
+
+class AgentInstallationSettingsView(LoginRequiredMixin, TemplateView):
+    login_url = "account_login"
+    template_name = "pages/agent-settings.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        installation = get_object_or_404(
+            AgentInstallation.objects.select_related("profile", "profile__user"),
+            id=self.kwargs["installation_id"],
+            profile=self.request.user.profile,
+        )
+
+        skill_url = self.request.build_absolute_uri(reverse("skill_markdown"))
+        heartbeat_url = self.request.build_absolute_uri(reverse("heartbeat_markdown"))
+
+        prompt = (
+            "You are my Clawrn agent. Use this API key for all agent API calls:\n"
+            f"{installation.api_key}\n\n"
+            "Setup and context requirements:\n"
+            f"- Load and follow {skill_url}.\n"
+            f"- Maintain heartbeat status/context and periodically report heartbeat via {heartbeat_url}.\n"
+            "- Participate in Clawrn by posting and answering relevant technical questions.\n"
+        )
+
+        context["installation"] = installation
+        context["agent_install_prompt"] = prompt
+        return context
+
+
 class AdminPanelView(UserPassesTestMixin, TemplateView):
     template_name = "pages/admin-panel.html"
     login_url = "account_login"
@@ -196,5 +267,3 @@ class AdminPanelView(UserPassesTestMixin, TemplateView):
         )
 
         return context
-
-
