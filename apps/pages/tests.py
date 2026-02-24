@@ -2,10 +2,10 @@ import re
 
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
+from django.urls import reverse
 
-from apps.api.models import Answer, Question
-from apps.core.models import Profile
-from apps.pages.views import LandingPageView
+from apps.api.models import Answer, AnswerVote, AnswerVoteDirection, Question
+from apps.pages.views import LandingPageView, QuestionDetailView
 
 
 class PagesMarkdownEndpointsTestCase(TestCase):
@@ -17,10 +17,11 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         context = view.get_context_data()
         self.assertEqual(context["skill_url"], "https://testserver/skill.md")
 
-
     def test_landing_context_includes_latest_question_and_answer(self):
         asker_user = User.objects.create_user(username="asker", email="asker@example.com")
-        responder_user = User.objects.create_user(username="responder", email="responder@example.com")
+        responder_user = User.objects.create_user(
+            username="responder", email="responder@example.com"
+        )
 
         # Profiles are created automatically (signal/OneToOne); don't create duplicates.
         asker_profile = asker_user.profile
@@ -44,6 +45,69 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         context = view.get_context_data()
         self.assertEqual(context["latest_question"].id, question.id)
         self.assertEqual(context["latest_answer"].id, answer.id)
+
+    def test_question_detail_page_shows_question_with_answers_and_vote_totals(self):
+        asker_user = User.objects.create_user(
+            username="detail_asker", email="detail-asker@example.com"
+        )
+        voter_user = User.objects.create_user(
+            username="detail_voter", email="detail-voter@example.com"
+        )
+        responder_a = User.objects.create_user(
+            username="detail_responder_a", email="detail-a@example.com"
+        )
+        responder_b = User.objects.create_user(
+            username="detail_responder_b", email="detail-b@example.com"
+        )
+
+        question = Question.objects.create(
+            author=asker_user.profile,
+            title="How should question detail pages be structured?",
+            body="Need the question first, then answers with vote context.",
+        )
+
+        lower_ranked_answer = Answer.objects.create(
+            question=question,
+            author=responder_a.profile,
+            body="Render votes but do not sort answers.",
+        )
+        higher_ranked_answer = Answer.objects.create(
+            question=question,
+            author=responder_b.profile,
+            body="Show question first, then answers ordered by score.",
+        )
+
+        AnswerVote.objects.create(
+            answer=higher_ranked_answer,
+            voter=voter_user.profile,
+            direction=AnswerVoteDirection.UP,
+            implemented=True,
+        )
+        AnswerVote.objects.create(
+            answer=lower_ranked_answer,
+            voter=asker_user.profile,
+            direction=AnswerVoteDirection.DOWN,
+            implemented=True,
+        )
+
+        self.assertEqual(
+            reverse("question_detail", args=[question.id]), f"/questions/{question.id}"
+        )
+
+        request = RequestFactory().get(f"/questions/{question.id}", HTTP_HOST="testserver")
+        view = QuestionDetailView()
+        view.setup(request, question_id=question.id)
+        context = view.get_context_data(question_id=question.id)
+
+        self.assertEqual(context["question"].id, question.id)
+        answers = list(context["answers"])
+        self.assertEqual([a.id for a in answers], [higher_ranked_answer.id, lower_ranked_answer.id])
+        self.assertEqual(answers[0].score, 1)
+        self.assertEqual(answers[0].upvotes, 1)
+        self.assertEqual(answers[0].downvotes, 0)
+        self.assertEqual(answers[1].score, -1)
+        self.assertEqual(answers[1].upvotes, 0)
+        self.assertEqual(answers[1].downvotes, 1)
 
     def test_skill_markdown_endpoint(self):
         response = self.client.get("/skill.md")
@@ -90,7 +154,7 @@ class PagesMarkdownEndpointsTestCase(TestCase):
             "## One-line instruction for a user to give their OpenClaw agent",
             "## Registration",
             "## Verification gate",
-            "## API key release (after human says \"done\")",
+            '## API key release (after human says "done")',
             "## Machine-readable onboarding checklist (after you have API key)",
             "## Q&A loop",
             "## Recommended cron jobs (run both)",
