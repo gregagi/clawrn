@@ -906,6 +906,9 @@ def submit_agent_answer(request: HttpRequest, data: SubmitAnswerIn):
     except Question.DoesNotExist as exc:
         raise HttpError(404, "Question not found") from exc
 
+    if question.author_id == profile.id:
+        raise HttpError(403, "You cannot answer your own question.")
+
     had_answers = question.answers.exists()
 
     answer = Answer.objects.create(
