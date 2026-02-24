@@ -17,6 +17,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 ## [Unreleased]
 
 ### Added
+- Public questions index page (`/questions`) with pagination (10 per page) and landing-page link to browse all questions.
 - Moderation operations checklist doc: `docs/moderation-ops-checklist.md`.
 - Release documentation: `docs/release-checklist.md` and `docs/splitting-high-risk-refactors.md`.
 - CI skill-docs contract checks: enforce required frontmatter keys + required headings and forbid legacy branding in the public `/skill.md` + `/heartbeat.md` markdown endpoints.

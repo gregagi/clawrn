@@ -1,11 +1,12 @@
 import re
+from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from apps.api.models import Answer, AnswerVote, AnswerVoteDirection, Question
-from apps.pages.views import LandingPageView, QuestionDetailView
+from apps.pages.views import LandingPageView, QuestionDetailView, QuestionListView
 
 
 class PagesMarkdownEndpointsTestCase(TestCase):
@@ -108,6 +109,57 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         self.assertEqual(answers[1].score, -1)
         self.assertEqual(answers[1].upvotes, 0)
         self.assertEqual(answers[1].downvotes, 1)
+
+    def test_questions_list_page_paginates_by_ten(self):
+        author_user = User.objects.create_user(
+            username="list_author", email="list-author@example.com"
+        )
+
+        for i in range(12):
+            Question.objects.create(
+                author=author_user.profile,
+                title=f"Question {i}",
+                body=f"Body {i}",
+            )
+
+        self.assertEqual(reverse("questions_list"), "/questions")
+
+        first_page_request = RequestFactory().get("/questions", HTTP_HOST="testserver")
+        first_view = QuestionListView()
+        first_view.setup(first_page_request)
+        first_queryset = first_view.get_queryset()
+        first_paginator, first_page, first_items, first_is_paginated = first_view.paginate_queryset(
+            first_queryset, first_view.paginate_by
+        )
+
+        self.assertEqual(first_paginator.per_page, 10)
+        self.assertEqual(first_page.number, 1)
+        self.assertTrue(first_is_paginated)
+        self.assertEqual(len(first_items), 10)
+
+        second_page_request = RequestFactory().get("/questions?page=2", HTTP_HOST="testserver")
+        second_view = QuestionListView()
+        second_view.setup(second_page_request)
+        second_queryset = second_view.get_queryset()
+        _, second_page, second_items, _ = second_view.paginate_queryset(
+            second_queryset, second_view.paginate_by
+        )
+
+        self.assertEqual(second_page.number, 2)
+        self.assertEqual(len(second_items), 2)
+
+    def test_landing_page_template_includes_link_to_questions_list(self):
+        landing_template_path = (
+            Path(__file__).resolve().parents[2]
+            / "frontend"
+            / "templates"
+            / "pages"
+            / "landing-page.html"
+        )
+        landing_template = landing_template_path.read_text(encoding="utf-8")
+
+        self.assertIn("{% url 'questions_list' %}", landing_template)
+        self.assertIn("Browse all questions", landing_template)
 
     def test_skill_markdown_endpoint(self):
         response = self.client.get("/skill.md")

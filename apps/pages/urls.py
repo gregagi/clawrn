@@ -4,6 +4,7 @@ from apps.pages import views
 
 urlpatterns = [
     path("", views.LandingPageView.as_view(), name="landing"),
+    path("questions", views.QuestionListView.as_view(), name="questions_list"),
     path("questions/<int:question_id>", views.QuestionDetailView.as_view(), name="question_detail"),
     path("skill.md", views.skill_markdown, name="skill_markdown"),
     path("skill/v1.md", views.skill_markdown_v1, name="skill_markdown_v1"),

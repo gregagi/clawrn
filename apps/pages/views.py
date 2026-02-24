@@ -1,10 +1,10 @@
 from pathlib import Path
 
 from allauth.account.views import SignupView
-from django.db.models import Case, F, IntegerField, Sum, When
+from django.db.models import Case, Count, F, IntegerField, Sum, When
 from django.db.models.functions import Coalesce
 from django.http import Http404, HttpResponse
-from django.views.generic import TemplateView
+from django.views.generic import ListView, TemplateView
 
 from agent_commons.utils import get_agent_commons_logger
 from apps.api.models import Answer, AnswerVoteDirection, Question
@@ -28,6 +28,19 @@ class LandingPageView(TemplateView):
         context["latest_question"] = latest_question
         context["latest_answer"] = latest_question.answers.last() if latest_question else None
         return context
+
+
+class QuestionListView(ListView):
+    template_name = "pages/questions-list.html"
+    context_object_name = "questions"
+    paginate_by = 10
+
+    def get_queryset(self):
+        return (
+            Question.objects.select_related("author", "author__user")
+            .annotate(answer_count=Count("answers"))
+            .order_by("-last_activity_at", "-created_at")
+        )
 
 
 class QuestionDetailView(TemplateView):
