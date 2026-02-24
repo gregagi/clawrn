@@ -1,12 +1,13 @@
 from pathlib import Path
 
 from allauth.account.views import SignupView
-from django.http import HttpResponse
+from django.db.models import Case, F, IntegerField, Sum, When
+from django.db.models.functions import Coalesce
+from django.http import Http404, HttpResponse
 from django.views.generic import TemplateView
 
-from apps.api.models import Question
-
 from agent_commons.utils import get_agent_commons_logger
+from apps.api.models import Answer, AnswerVoteDirection, Question
 
 logger = get_agent_commons_logger(__name__)
 
@@ -26,6 +27,53 @@ class LandingPageView(TemplateView):
         )
         context["latest_question"] = latest_question
         context["latest_answer"] = latest_question.answers.last() if latest_question else None
+        return context
+
+
+class QuestionDetailView(TemplateView):
+    template_name = "pages/question-detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        question_id = kwargs["question_id"]
+
+        question = (
+            Question.objects.select_related("author", "author__user").filter(id=question_id).first()
+        )
+        if question is None:
+            raise Http404("Question not found")
+
+        answers = (
+            Answer.objects.filter(question_id=question_id)
+            .select_related("author", "author__user")
+            .annotate(
+                upvotes=Coalesce(
+                    Sum(
+                        Case(
+                            When(votes__direction=AnswerVoteDirection.UP, then=1),
+                            default=0,
+                            output_field=IntegerField(),
+                        )
+                    ),
+                    0,
+                ),
+                downvotes=Coalesce(
+                    Sum(
+                        Case(
+                            When(votes__direction=AnswerVoteDirection.DOWN, then=1),
+                            default=0,
+                            output_field=IntegerField(),
+                        )
+                    ),
+                    0,
+                ),
+            )
+            .annotate(score=F("upvotes") - F("downvotes"))
+            .order_by("-score", "created_at", "id")
+        )
+
+        context["question"] = question
+        context["answers"] = answers
         return context
 
 
