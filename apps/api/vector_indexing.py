@@ -10,6 +10,9 @@ from agent_commons.utils import get_agent_commons_logger
 
 logger = get_agent_commons_logger(__name__)
 
+# Cache collection existence checks in-process to avoid repeated PUTs.
+_COLLECTION_CACHE: set[tuple[str, str, int]] = set()
+
 
 @dataclass(frozen=True)
 class VectorIndexConfig:
@@ -95,7 +98,11 @@ def _qdrant_headers(config: VectorIndexConfig) -> dict[str, str]:
     return headers
 
 
-def _ensure_collection(config: VectorIndexConfig, vector_size: int) -> None:
+def _ensure_collection(config: VectorIndexConfig, vector_size: int) -> bool:
+    cache_key = (config.qdrant_url.rstrip("/"), config.qdrant_collection, vector_size)
+    if cache_key in _COLLECTION_CACHE:
+        return True
+
     url = f"{config.qdrant_url.rstrip('/')}/collections/{config.qdrant_collection}"
     payload = {
         "vectors": {
@@ -105,17 +112,22 @@ def _ensure_collection(config: VectorIndexConfig, vector_size: int) -> None:
     }
     try:
         _request_json(url, "PUT", payload, _qdrant_headers(config))
+        _COLLECTION_CACHE.add(cache_key)
+        return True
     except error.HTTPError as exc:
         if exc.code == 409:
-            return
+            _COLLECTION_CACHE.add(cache_key)
+            return True
         logger.error(
             "Qdrant collection create failed",
             status=exc.code,
             error=str(exc),
             exc_info=True,
         )
+        return False
     except Exception as exc:
         logger.error("Qdrant collection create failed", error=str(exc), exc_info=True)
+        return False
 
 
 def _upsert_point(
@@ -123,7 +135,7 @@ def _upsert_point(
     point_id: str,
     vector: list[float],
     payload: dict,
-) -> None:
+) -> bool:
     url = (
         f"{config.qdrant_url.rstrip('/')}/collections/{config.qdrant_collection}"
         "/points?wait=true"
@@ -140,48 +152,54 @@ def _upsert_point(
 
     try:
         _request_json(url, "PUT", body, _qdrant_headers(config))
+        return True
     except Exception as exc:
         logger.error("Qdrant upsert failed", error=str(exc), exc_info=True)
+        return False
 
 
 def _point_id(prefix: str, record_id: int) -> str:
     return str(uuid5(NAMESPACE_URL, f"{prefix}:{record_id}"))
 
 
-def index_question_content(question) -> None:
+def index_question_content(question) -> bool:
     config = _load_config()
     if not _should_index(config):
-        return
+        return False
 
     text = f"{question.title}\n\n{question.body}".strip()
     embedding = _openai_embedding(text, config)
     if not embedding:
-        return
+        return False
 
-    _ensure_collection(config, len(embedding))
+    if not _ensure_collection(config, len(embedding)):
+        return False
+
     payload = {
         "content_type": "question",
         "question_id": question.id,
         "author_profile_id": question.author_id,
     }
-    _upsert_point(config, _point_id("question", question.id), embedding, payload)
+    return _upsert_point(config, _point_id("question", question.id), embedding, payload)
 
 
-def index_answer_content(answer) -> None:
+def index_answer_content(answer) -> bool:
     config = _load_config()
     if not _should_index(config):
-        return
+        return False
 
     text = answer.body.strip()
     embedding = _openai_embedding(text, config)
     if not embedding:
-        return
+        return False
 
-    _ensure_collection(config, len(embedding))
+    if not _ensure_collection(config, len(embedding)):
+        return False
+
     payload = {
         "content_type": "answer",
         "question_id": answer.question_id,
         "answer_id": answer.id,
         "author_profile_id": answer.author_id,
     }
-    _upsert_point(config, _point_id("answer", answer.id), embedding, payload)
+    return _upsert_point(config, _point_id("answer", answer.id), embedding, payload)

@@ -1,10 +1,13 @@
 import json
 from datetime import timedelta
+from io import StringIO
 from unittest.mock import patch
 
 from allauth.account.models import EmailAddress
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -972,3 +975,78 @@ class AgentCommonsModelsTestCase(TestCase):
         # p50 should match the single datapoint
         self.assertEqual(payload["time_to_first_answer_seconds_p50"], 60 * 60)
         self.assertEqual(payload["ttfv_seconds_p50"], 2 * 60 * 60)
+
+
+class BackfillQdrantVectorsCommandTestCase(TestCase):
+    def setUp(self):
+        cache.clear()
+
+        asker_user = User.objects.create_user(username="bf_asker", email="bf-asker@example.com")
+        responder_user = User.objects.create_user(
+            username="bf_responder", email="bf-responder@example.com"
+        )
+
+        self.asker_profile = asker_user.profile
+        self.responder_profile = responder_user.profile
+
+        self.question_1 = Question.objects.create(
+            author=self.asker_profile,
+            title="Q1",
+            body="Body one long enough for test coverage.",
+        )
+        self.question_2 = Question.objects.create(
+            author=self.asker_profile,
+            title="Q2",
+            body="Body two long enough for test coverage.",
+        )
+
+        self.answer_1 = Answer.objects.create(
+            question=self.question_1,
+            author=self.responder_profile,
+            body="Answer one long enough for test coverage.",
+        )
+        self.answer_2 = Answer.objects.create(
+            question=self.question_2,
+            author=self.responder_profile,
+            body="Answer two long enough for test coverage.",
+        )
+
+    @patch("apps.api.management.commands.backfill_qdrant_vectors.index_answer_content")
+    @patch("apps.api.management.commands.backfill_qdrant_vectors.index_question_content")
+    def test_backfill_command_indexes_existing_questions_and_answers(
+        self,
+        index_question_mock,
+        index_answer_mock,
+    ):
+        index_question_mock.return_value = True
+        index_answer_mock.return_value = True
+
+        output = StringIO()
+        call_command("backfill_qdrant_vectors", stdout=output)
+
+        self.assertEqual(index_question_mock.call_count, 2)
+        self.assertEqual(index_answer_mock.call_count, 2)
+        self.assertIn("Questions processed: 2, indexed: 2, skipped: 0", output.getvalue())
+        self.assertIn("Answers processed: 2, indexed: 2, skipped: 0", output.getvalue())
+
+    @patch("apps.api.management.commands.backfill_qdrant_vectors.index_answer_content")
+    @patch("apps.api.management.commands.backfill_qdrant_vectors.index_question_content")
+    def test_backfill_command_supports_filters_and_limit(
+        self,
+        index_question_mock,
+        index_answer_mock,
+    ):
+        index_question_mock.return_value = True
+        index_answer_mock.return_value = True
+
+        output = StringIO()
+        call_command("backfill_qdrant_vectors", "--questions-only", "--limit", "1", stdout=output)
+
+        self.assertEqual(index_question_mock.call_count, 1)
+        self.assertEqual(index_answer_mock.call_count, 0)
+        self.assertIn("Questions processed: 1, indexed: 1, skipped: 0", output.getvalue())
+        self.assertIn("Answers processed: 0, indexed: 0, skipped: 0", output.getvalue())
+
+    def test_backfill_command_rejects_conflicting_modes(self):
+        with self.assertRaises(CommandError):
+            call_command("backfill_qdrant_vectors", "--questions-only", "--answers-only")
