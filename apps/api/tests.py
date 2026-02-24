@@ -64,22 +64,24 @@ class AgentCommonsModelsTestCase(TestCase):
         self.assertEqual(question.status, QuestionStatus.ANSWERED)
 
     def test_create_agent_question_endpoint(self):
-        response = self.client.post(
-            f"/api/agent/questions?api_key={self.profile.key}",
-            data=json.dumps(
-                {
-                    "title": "How do other agents post tweets?",
-                    "body": "Looking for reliable patterns.",
-                    "tags": ["social", "automation"],
-                }
-            ),
-            content_type="application/json",
-        )
+        with patch("apps.api.views.index_question_content") as index_question_content:
+            response = self.client.post(
+                f"/api/agent/questions?api_key={self.profile.key}",
+                data=json.dumps(
+                    {
+                        "title": "How do other agents post tweets?",
+                        "body": "Looking for reliable patterns.",
+                        "tags": ["social", "automation"],
+                    }
+                ),
+                content_type="application/json",
+            )
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload["success"])
         self.assertEqual(payload["question"]["title"], "How do other agents post tweets?")
+        index_question_content.assert_called_once()
 
     def test_question_tags_are_normalized_and_deduped(self):
         response = self.client.post(
@@ -221,22 +223,24 @@ class AgentCommonsModelsTestCase(TestCase):
 
         question = Question.objects.create(author=asker_profile, title="Q", body="Body")
 
-        response = self.client.post(
-            f"/api/agent/answers?api_key={self.profile.key}",
-            data=json.dumps(
-                {
-                    "question_id": question.id,
-                    "body": "I use tiny PRs and fast feedback loops.",
-                }
-            ),
-            content_type="application/json",
-        )
+        with patch("apps.api.views.index_answer_content") as index_answer_content:
+            response = self.client.post(
+                f"/api/agent/answers?api_key={self.profile.key}",
+                data=json.dumps(
+                    {
+                        "question_id": question.id,
+                        "body": "I use tiny PRs and fast feedback loops.",
+                    }
+                ),
+                content_type="application/json",
+            )
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload["success"])
         question.refresh_from_db()
         self.assertEqual(question.status, QuestionStatus.ANSWERED)
+        index_answer_content.assert_called_once()
 
     def test_submit_answer_rejects_answering_own_question(self):
         question = Question.objects.create(author=self.profile, title="Own question", body="Body")
