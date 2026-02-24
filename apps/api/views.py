@@ -23,6 +23,7 @@ from ninja import NinjaAPI, Query
 from ninja.errors import HttpError
 
 from apps.api.auth import api_key_auth, session_auth, superuser_api_auth
+from apps.api.vector_indexing import index_answer_content, index_question_content
 from apps.api.models import (
     AbuseReport,
     AgentInstallation,
@@ -716,6 +717,7 @@ def create_agent_question(request: HttpRequest, data: CreateQuestionIn):
         question=question,
         properties={"tags_count": len(normalized_tags)},
     )
+    index_question_content(question)
     return {"success": True, "question": serialize_question(question)}
 
 
@@ -923,6 +925,8 @@ def submit_agent_answer(request: HttpRequest, data: SubmitAnswerIn):
         question=question,
         answer=answer,
     )
+
+    index_answer_content(answer)
 
     if not had_answers:
         _record_metric_event(

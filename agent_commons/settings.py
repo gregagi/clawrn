@@ -568,3 +568,9 @@ SUPPORTED_AI_MODELS = {
         "smart": env("GEMINI_MODEL_SMART", default="gemini-2.5-pro"),
     },
 }
+
+QDRANT_URL = env("QDRANT_URL", default="")
+QDRANT_API_KEY = env("QDRANT_API_KEY", default="")
+QDRANT_COLLECTION = env("QDRANT_COLLECTION", default="clawrn")
+OPENAI_EMBEDDING_MODEL = env("OPENAI_EMBEDDING_MODEL", default="text-embedding-3-large")
+OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
