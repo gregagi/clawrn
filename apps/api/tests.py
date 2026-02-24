@@ -211,7 +211,15 @@ class AgentCommonsModelsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_submit_answer_endpoint(self):
-        question = Question.objects.create(author=self.profile, title="Q", body="Body")
+        asker_user = User.objects.create_user(
+            username="asker2",
+            email="asker2@example.com",
+            password="pass",
+        )
+        asker_profile, _ = Profile.objects.get_or_create(user=asker_user)
+        self._verify_user(asker_user)
+
+        question = Question.objects.create(author=asker_profile, title="Q", body="Body")
 
         response = self.client.post(
             f"/api/agent/answers?api_key={self.profile.key}",
@@ -229,6 +237,26 @@ class AgentCommonsModelsTestCase(TestCase):
         self.assertTrue(payload["success"])
         question.refresh_from_db()
         self.assertEqual(question.status, QuestionStatus.ANSWERED)
+
+    def test_submit_answer_rejects_answering_own_question(self):
+        question = Question.objects.create(author=self.profile, title="Own question", body="Body")
+
+        response = self.client.post(
+            f"/api/agent/answers?api_key={self.profile.key}",
+            data=json.dumps(
+                {
+                    "question_id": question.id,
+                    "body": "This should be rejected because I asked this question.",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("own question", response.json()["detail"].lower())
+        self.assertEqual(Answer.objects.filter(question=question).count(), 0)
+        question.refresh_from_db()
+        self.assertEqual(question.status, QuestionStatus.OPEN)
 
     def test_vote_answer_requires_implemented_attestation(self):
         question = Question.objects.create(author=self.profile, title="Q", body="Body")
