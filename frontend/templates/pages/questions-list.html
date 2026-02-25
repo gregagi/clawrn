@@ -25,6 +25,14 @@
           placeholder="Search questions"
           class="w-full rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:focus:border-gray-500 dark:focus:ring-gray-800"
         />
+        <select
+          name="sort"
+          class="w-full rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:focus:border-gray-500 dark:focus:ring-gray-800 sm:w-52"
+        >
+          <option value="">Sort: relevance</option>
+          <option value="upvotes" {% if sort_key == "upvotes" %}selected{% endif %}>Most upvotes</option>
+          <option value="created" {% if sort_key == "created" %}selected{% endif %}>Newest</option>
+        </select>
         <button
           type="submit"
           class="inline-flex items-center justify-center rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800"
@@ -70,8 +78,8 @@
         <nav class="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900" aria-label="Pagination">
           <div>
             {% if page_obj.has_previous %}
-              {% if search_query %}
-                <a href="?q={{ search_query|urlencode }}&page={{ page_obj.previous_page_number }}" class="inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800">← Previous</a>
+              {% if search_query or sort_key %}
+                <a href="?{% if search_query %}q={{ search_query|urlencode }}&{% endif %}{% if sort_key %}sort={{ sort_key }}&{% endif %}page={{ page_obj.previous_page_number }}" class="inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800">← Previous</a>
               {% else %}
                 <a href="?page={{ page_obj.previous_page_number }}" class="inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800">← Previous</a>
               {% endif %}
@@ -80,8 +88,8 @@
           <p class="text-sm text-gray-600 dark:text-gray-300">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</p>
           <div>
             {% if page_obj.has_next %}
-              {% if search_query %}
-                <a href="?q={{ search_query|urlencode }}&page={{ page_obj.next_page_number }}" class="inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800">Next →</a>
+              {% if search_query or sort_key %}
+                <a href="?{% if search_query %}q={{ search_query|urlencode }}&{% endif %}{% if sort_key %}sort={{ sort_key }}&{% endif %}page={{ page_obj.next_page_number }}" class="inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800">Next →</a>
               {% else %}
                 <a href="?page={{ page_obj.next_page_number }}" class="inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800">Next →</a>
               {% endif %}

@@ -36,17 +36,48 @@ class QuestionListView(ListView):
     template_name = "pages/questions-list.html"
     context_object_name = "questions"
     paginate_by = 10
+    sort_keys = {"upvotes", "created"}
 
     def _search_query(self) -> str:
         return (self.request.GET.get("q") or self.request.GET.get("search") or "").strip()
 
+    def _sort_key(self) -> str:
+        sort_key = (self.request.GET.get("sort") or "").strip().lower()
+        if sort_key in self.sort_keys:
+            return sort_key
+        return ""
+
+    def _apply_sort(self, queryset, sort_key):
+        if sort_key == "upvotes":
+            return (
+                queryset.annotate(
+                    question_upvotes=Coalesce(
+                        Sum(
+                            Case(
+                                When(answers__votes__direction=AnswerVoteDirection.UP, then=1),
+                                default=0,
+                                output_field=IntegerField(),
+                            )
+                        ),
+                        0,
+                    )
+                )
+                .order_by("-question_upvotes", "-last_activity_at", "-created_at")
+            )
+        if sort_key == "created":
+            return queryset.order_by("-created_at", "-id")
+        return queryset
+
     def get_queryset(self):
         base_queryset = (
             Question.objects.select_related("author", "author__user")
-            .annotate(answer_count=Count("answers"))
+            .annotate(answer_count=Count("answers", distinct=True))
         )
         search_query = self._search_query()
+        sort_key = self._sort_key()
         if not search_query:
+            if sort_key:
+                return self._apply_sort(base_queryset, sort_key)
             return base_queryset.order_by("-last_activity_at", "-created_at")
 
         title_score = Case(
@@ -89,19 +120,22 @@ class QuestionListView(ListView):
                     | Q(title__icontains=search_query)
                     | Q(body__icontains=search_query)
                 )
-                .order_by("-combined_score", "-last_activity_at", "-created_at")
             )
-            return queryset
+            if sort_key:
+                return self._apply_sort(queryset, sort_key)
+            return queryset.order_by("-combined_score", "-last_activity_at", "-created_at")
 
-        return (
-            queryset.filter(
-                Q(title__icontains=search_query) | Q(body__icontains=search_query)
-            ).order_by("-lexical_score", "-last_activity_at", "-created_at")
+        queryset = queryset.filter(
+            Q(title__icontains=search_query) | Q(body__icontains=search_query)
         )
+        if sort_key:
+            return self._apply_sort(queryset, sort_key)
+        return queryset.order_by("-lexical_score", "-last_activity_at", "-created_at")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["search_query"] = self._search_query()
+        context["sort_key"] = self._sort_key()
         return context
 
 
