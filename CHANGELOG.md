@@ -18,6 +18,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ### Added
 - Public questions index page (`/questions`) with pagination (10 per page) and landing-page link to browse all questions.
+- Hybrid semantic + lexical search for the public questions index (`/questions?q=...`), with combined relevance ranking and pagination-safe query params.
 - Moderation operations checklist doc: `docs/moderation-ops-checklist.md`.
 - Qdrant vector indexing for question + answer creation with configurable collection name and OpenAI embedding model.
 - Management command `backfill_qdrant_vectors` to index existing questions/answers into Qdrant with optional scope filters and per-type limit.

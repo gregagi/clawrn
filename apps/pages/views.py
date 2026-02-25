@@ -1,13 +1,14 @@
 from pathlib import Path
 
 from allauth.account.views import SignupView
-from django.db.models import Case, Count, F, IntegerField, Sum, When
+from django.db.models import Case, Count, F, FloatField, IntegerField, Q, Sum, Value, When
 from django.db.models.functions import Coalesce
 from django.http import Http404, HttpResponse
 from django.views.generic import ListView, TemplateView
 
 from agent_commons.utils import get_agent_commons_logger
 from apps.api.models import Answer, AnswerVoteDirection, Question
+from apps.api.vector_indexing import semantic_question_search
 
 logger = get_agent_commons_logger(__name__)
 
@@ -35,12 +36,72 @@ class QuestionListView(ListView):
     context_object_name = "questions"
     paginate_by = 10
 
+    def _search_query(self) -> str:
+        return (self.request.GET.get("q") or self.request.GET.get("search") or "").strip()
+
     def get_queryset(self):
-        return (
+        base_queryset = (
             Question.objects.select_related("author", "author__user")
             .annotate(answer_count=Count("answers"))
-            .order_by("-last_activity_at", "-created_at")
         )
+        search_query = self._search_query()
+        if not search_query:
+            return base_queryset.order_by("-last_activity_at", "-created_at")
+
+        title_score = Case(
+            When(title__icontains=search_query, then=Value(2.0)),
+            default=Value(0.0),
+            output_field=FloatField(),
+        )
+        body_score = Case(
+            When(body__icontains=search_query, then=Value(1.0)),
+            default=Value(0.0),
+            output_field=FloatField(),
+        )
+        queryset = base_queryset.annotate(
+            title_score=title_score,
+            body_score=body_score,
+        ).annotate(
+            lexical_score=F("title_score") + F("body_score"),
+        )
+
+        semantic_hits = semantic_question_search(search_query, limit=200)
+        if semantic_hits:
+            semantic_cases = [
+                When(id=question_id, then=Value(score))
+                for question_id, score in semantic_hits
+            ]
+            semantic_ids = [question_id for question_id, _ in semantic_hits]
+            queryset = (
+                queryset.annotate(
+                    semantic_score=Case(
+                        *semantic_cases,
+                        default=Value(0.0),
+                        output_field=FloatField(),
+                    )
+                )
+                .annotate(
+                    combined_score=F("lexical_score") + F("semantic_score"),
+                )
+                .filter(
+                    Q(id__in=semantic_ids)
+                    | Q(title__icontains=search_query)
+                    | Q(body__icontains=search_query)
+                )
+                .order_by("-combined_score", "-last_activity_at", "-created_at")
+            )
+            return queryset
+
+        return (
+            queryset.filter(
+                Q(title__icontains=search_query) | Q(body__icontains=search_query)
+            ).order_by("-lexical_score", "-last_activity_at", "-created_at")
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["search_query"] = self._search_query()
+        return context
 
 
 class QuestionDetailView(TemplateView):

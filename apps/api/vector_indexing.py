@@ -203,3 +203,93 @@ def index_answer_content(answer) -> bool:
         "author_profile_id": answer.author_id,
     }
     return _upsert_point(config, _point_id("answer", answer.id), embedding, payload)
+
+
+def _parse_semantic_question_hits(response: dict) -> list[tuple[int, float]]:
+    raw_result = response.get("result")
+
+    if isinstance(raw_result, dict):
+        points = raw_result.get("points") or raw_result.get("result") or []
+    elif isinstance(raw_result, list):
+        points = raw_result
+    else:
+        points = []
+
+    hits: list[tuple[int, float]] = []
+    for point in points:
+        payload_data = point.get("payload") or {}
+        question_id = payload_data.get("question_id")
+        score = point.get("score")
+        if isinstance(question_id, int) and isinstance(score, (int, float)):
+            hits.append((question_id, float(score)))
+    return hits
+
+
+def semantic_question_search(query: str, limit: int = 50) -> list[tuple[int, float]]:
+    config = _load_config()
+    if not _should_index(config):
+        return []
+
+    normalized_query = query.strip()
+    if not normalized_query:
+        return []
+
+    embedding = _openai_embedding(normalized_query, config)
+    if not embedding:
+        return []
+
+    if not _ensure_collection(config, len(embedding)):
+        return []
+
+    base_url = f"{config.qdrant_url.rstrip('/')}/collections/{config.qdrant_collection}"
+    headers = _qdrant_headers(config)
+
+    query_endpoint_payload = {
+        "query": embedding,
+        "limit": limit,
+        "with_payload": True,
+        "filter": {
+            "must": [
+                {"key": "content_type", "match": {"value": "question"}},
+            ]
+        },
+    }
+
+    search_endpoint_payload = {
+        "vector": embedding,
+        "limit": limit,
+        "with_payload": True,
+        "filter": {
+            "must": [
+                {"key": "content_type", "match": {"value": "question"}},
+            ]
+        },
+    }
+
+    try:
+        response = _request_json(
+            f"{base_url}/points/query",
+            "POST",
+            query_endpoint_payload,
+            headers,
+        )
+        return _parse_semantic_question_hits(response)
+    except error.HTTPError as exc:
+        if exc.code != 404:
+            logger.error("Qdrant semantic query failed", error=str(exc), exc_info=True)
+            return []
+    except Exception as exc:
+        logger.error("Qdrant semantic query failed", error=str(exc), exc_info=True)
+        return []
+
+    try:
+        response = _request_json(
+            f"{base_url}/points/search",
+            "POST",
+            search_endpoint_payload,
+            headers,
+        )
+        return _parse_semantic_question_hits(response)
+    except Exception as exc:
+        logger.error("Qdrant semantic search failed", error=str(exc), exc_info=True)
+        return []

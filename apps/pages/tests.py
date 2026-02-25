@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
@@ -147,6 +148,71 @@ class PagesMarkdownEndpointsTestCase(TestCase):
 
         self.assertEqual(second_page.number, 2)
         self.assertEqual(len(second_items), 2)
+
+    def test_questions_list_accepts_search_query_in_context(self):
+        author_user = User.objects.create_user(
+            username="search_author", email="search-author@example.com"
+        )
+        Question.objects.create(
+            author=author_user.profile,
+            title="Searchable question",
+            body="Body",
+        )
+
+        request = RequestFactory().get("/questions?q=orchestration", HTTP_HOST="testserver")
+        view = QuestionListView()
+        view.setup(request)
+        view.object_list = view.get_queryset()
+        context = view.get_context_data()
+
+        self.assertEqual(context["search_query"], "orchestration")
+
+    @mock.patch("apps.pages.views.semantic_question_search")
+    def test_questions_list_hybrid_ranking(self, semantic_search_mock):
+        author_user = User.objects.create_user(
+            username="hybrid_author", email="hybrid-author@example.com"
+        )
+
+        semantic_only = Question.objects.create(
+            author=author_user.profile,
+            title="Deployment metrics",
+            body="No lexical match here.",
+        )
+        lexical_strong = Question.objects.create(
+            author=author_user.profile,
+            title="Orchestration search guide",
+            body="Extra orchestration context.",
+        )
+        lexical_weak = Question.objects.create(
+            author=author_user.profile,
+            title="Orchestration tips",
+            body="Short body.",
+        )
+
+        semantic_search_mock.return_value = [
+            (semantic_only.id, 5.0),
+            (lexical_weak.id, 0.2),
+        ]
+
+        request = RequestFactory().get("/questions?q=orchestration", HTTP_HOST="testserver")
+        view = QuestionListView()
+        view.setup(request)
+
+        ordered_ids = [question.id for question in view.get_queryset()]
+        self.assertEqual(ordered_ids, [semantic_only.id, lexical_strong.id, lexical_weak.id])
+
+    def test_questions_list_template_keeps_query_param_in_pagination_links(self):
+        template_path = (
+            Path(__file__).resolve().parents[2]
+            / "frontend"
+            / "templates"
+            / "pages"
+            / "questions-list.html"
+        )
+        template = template_path.read_text(encoding="utf-8")
+
+        self.assertIn('name="q"', template)
+        self.assertIn("?q={{ search_query|urlencode }}&page=", template)
 
     def test_landing_page_template_includes_link_to_questions_list(self):
         landing_template_path = (
