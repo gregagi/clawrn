@@ -5,6 +5,7 @@ from unittest import mock
 from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.api.models import Answer, AnswerVote, AnswerVoteDirection, Question
 from apps.pages.views import AgentDetailView, LandingPageView, QuestionDetailView, QuestionListView
@@ -201,6 +202,108 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         ordered_ids = [question.id for question in view.get_queryset()]
         self.assertEqual(ordered_ids, [semantic_only.id, lexical_strong.id, lexical_weak.id])
 
+    def test_questions_list_sorts_by_upvotes(self):
+        author_user = User.objects.create_user(
+            username="vote_author", email="vote-author@example.com"
+        )
+        voter_user = User.objects.create_user(
+            username="vote_voter", email="vote-voter@example.com"
+        )
+
+        question_low = Question.objects.create(
+            author=author_user.profile,
+            title="Low votes",
+            body="Low body.",
+        )
+        question_high = Question.objects.create(
+            author=author_user.profile,
+            title="High votes",
+            body="High body.",
+        )
+
+        low_answer = Answer.objects.create(
+            question=question_low,
+            author=author_user.profile,
+            body="Low answer.",
+        )
+        high_answer = Answer.objects.create(
+            question=question_high,
+            author=author_user.profile,
+            body="High answer.",
+        )
+
+        AnswerVote.objects.create(
+            answer=low_answer,
+            voter=voter_user.profile,
+            direction=AnswerVoteDirection.UP,
+            implemented=True,
+        )
+        AnswerVote.objects.create(
+            answer=high_answer,
+            voter=voter_user.profile,
+            direction=AnswerVoteDirection.UP,
+            implemented=True,
+        )
+        AnswerVote.objects.create(
+            answer=high_answer,
+            voter=author_user.profile,
+            direction=AnswerVoteDirection.UP,
+            implemented=True,
+        )
+
+        request = RequestFactory().get("/questions?sort=upvotes", HTTP_HOST="testserver")
+        view = QuestionListView()
+        view.setup(request)
+
+        ordered_ids = [question.id for question in view.get_queryset()]
+        self.assertEqual(ordered_ids, [question_high.id, question_low.id])
+
+    def test_questions_list_sorts_by_created_date(self):
+        author_user = User.objects.create_user(
+            username="created_author", email="created-author@example.com"
+        )
+
+        older_question = Question.objects.create(
+            author=author_user.profile,
+            title="Older question",
+            body="Older body.",
+        )
+        newer_question = Question.objects.create(
+            author=author_user.profile,
+            title="Newer question",
+            body="Newer body.",
+        )
+
+        older_timestamp = timezone.now() - timezone.timedelta(days=2)
+        newer_timestamp = timezone.now() - timezone.timedelta(hours=1)
+        Question.objects.filter(id=older_question.id).update(created_at=older_timestamp)
+        Question.objects.filter(id=newer_question.id).update(created_at=newer_timestamp)
+
+        request = RequestFactory().get("/questions?sort=created", HTTP_HOST="testserver")
+        view = QuestionListView()
+        view.setup(request)
+
+        ordered_ids = [question.id for question in view.get_queryset()]
+        self.assertEqual(ordered_ids, [newer_question.id, older_question.id])
+
+    def test_questions_list_context_includes_sort_key(self):
+        author_user = User.objects.create_user(
+            username="sort_author", email="sort-author@example.com"
+        )
+        Question.objects.create(
+            author=author_user.profile,
+            title="Sorting question",
+            body="Body",
+        )
+
+        request = RequestFactory().get("/questions?sort=created", HTTP_HOST="testserver")
+        view = QuestionListView()
+        view.setup(request)
+        view.object_list = view.get_queryset()
+        context = view.get_context_data()
+
+        self.assertEqual(context["sort_key"], "created")
+
     def test_questions_list_template_keeps_query_param_in_pagination_links(self):
         template_path = (
             Path(__file__).resolve().parents[2]
@@ -212,7 +315,11 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         template = template_path.read_text(encoding="utf-8")
 
         self.assertIn('name="q"', template)
-        self.assertIn("?q={{ search_query|urlencode }}&page=", template)
+        self.assertIn('name="sort"', template)
+        self.assertIn("q={{ search_query|urlencode }}", template)
+        self.assertIn("sort={{ sort_key }}", template)
+        self.assertIn("page={{ page_obj.previous_page_number }}", template)
+        self.assertIn("page={{ page_obj.next_page_number }}", template)
 
     def test_agent_detail_route_uses_uuid(self):
         agent_user = User.objects.create_user(username="agent", email="agent@example.com")
