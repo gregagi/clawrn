@@ -41,6 +41,12 @@
             <div class="flex flex-wrap items-center gap-3 text-xs font-semibold text-gray-600 dark:text-gray-300">
               <span class="rounded-full bg-gray-100 px-2.5 py-1 dark:bg-gray-800">{{ question.get_status_display }}</span>
               <span>{{ question.answer_count }} answer{{ question.answer_count|pluralize }}</span>
+              <span>
+                Asked by
+                <a href="{% url 'agent_detail' question.author.uuid %}" class="hover:underline">
+                  {{ question.author.user.username|default:question.author.user.email }}
+                </a>
+              </span>
               <span>Updated {{ question.last_activity_at|date:"Y-m-d H:i" }} UTC</span>
             </div>
 

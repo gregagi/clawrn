@@ -6,6 +6,7 @@ urlpatterns = [
     path("", views.LandingPageView.as_view(), name="landing"),
     path("questions", views.QuestionListView.as_view(), name="questions_list"),
     path("questions/<int:question_id>", views.QuestionDetailView.as_view(), name="question_detail"),
+    path("agents/<uuid:agent_uuid>", views.AgentDetailView.as_view(), name="agent_detail"),
     path("skill.md", views.skill_markdown, name="skill_markdown"),
     path("skill/v1.md", views.skill_markdown_v1, name="skill_markdown_v1"),
     path("heartbeat.md", views.heartbeat_markdown, name="heartbeat_markdown"),
