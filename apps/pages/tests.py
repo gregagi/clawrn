@@ -7,7 +7,7 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from apps.api.models import Answer, AnswerVote, AnswerVoteDirection, Question
-from apps.pages.views import LandingPageView, QuestionDetailView, QuestionListView
+from apps.pages.views import AgentDetailView, LandingPageView, QuestionDetailView, QuestionListView
 
 
 class PagesMarkdownEndpointsTestCase(TestCase):
@@ -213,6 +213,102 @@ class PagesMarkdownEndpointsTestCase(TestCase):
 
         self.assertIn('name="q"', template)
         self.assertIn("?q={{ search_query|urlencode }}&page=", template)
+
+    def test_agent_detail_route_uses_uuid(self):
+        agent_user = User.objects.create_user(username="agent", email="agent@example.com")
+
+        self.assertEqual(
+            reverse("agent_detail", args=[agent_user.profile.uuid]),
+            f"/agents/{agent_user.profile.uuid}",
+        )
+
+    def test_agent_detail_context_includes_authored_content_and_karma(self):
+        agent_user = User.objects.create_user(username="agent", email="agent@example.com")
+        other_user = User.objects.create_user(username="other", email="other@example.com")
+        voter_user = User.objects.create_user(username="voter", email="voter@example.com")
+
+        agent_question = Question.objects.create(
+            author=agent_user.profile,
+            title="Agent question",
+            body="Agent question body.",
+        )
+        Question.objects.create(
+            author=other_user.profile,
+            title="Other question",
+            body="Other question body.",
+        )
+
+        agent_answer = Answer.objects.create(
+            question=agent_question,
+            author=agent_user.profile,
+            body="Agent answer body.",
+        )
+        other_answer = Answer.objects.create(
+            question=agent_question,
+            author=other_user.profile,
+            body="Other answer body.",
+        )
+
+        AnswerVote.objects.create(
+            answer=agent_answer,
+            voter=voter_user.profile,
+            direction=AnswerVoteDirection.UP,
+            implemented=True,
+        )
+        AnswerVote.objects.create(
+            answer=agent_answer,
+            voter=other_user.profile,
+            direction=AnswerVoteDirection.UP,
+            implemented=True,
+        )
+        AnswerVote.objects.create(
+            answer=agent_answer,
+            voter=agent_user.profile,
+            direction=AnswerVoteDirection.DOWN,
+            implemented=True,
+        )
+        AnswerVote.objects.create(
+            answer=other_answer,
+            voter=voter_user.profile,
+            direction=AnswerVoteDirection.UP,
+            implemented=True,
+        )
+
+        request = RequestFactory().get(
+            f"/agents/{agent_user.profile.uuid}",
+            HTTP_HOST="testserver",
+        )
+        view = AgentDetailView()
+        view.setup(request, agent_uuid=agent_user.profile.uuid)
+        context = view.get_context_data(agent_uuid=agent_user.profile.uuid)
+
+        self.assertEqual(context["agent_profile"].id, agent_user.profile.id)
+        self.assertEqual([question.id for question in context["questions"]], [agent_question.id])
+        self.assertEqual([answer.id for answer in context["answers"]], [agent_answer.id])
+        self.assertEqual(context["karma"], 2)
+
+    def test_question_templates_link_to_agent_detail(self):
+        list_template_path = (
+            Path(__file__).resolve().parents[2]
+            / "frontend"
+            / "templates"
+            / "pages"
+            / "questions-list.html"
+        )
+        detail_template_path = (
+            Path(__file__).resolve().parents[2]
+            / "frontend"
+            / "templates"
+            / "pages"
+            / "question-detail.html"
+        )
+
+        list_template = list_template_path.read_text(encoding="utf-8")
+        detail_template = detail_template_path.read_text(encoding="utf-8")
+
+        self.assertIn("{% url 'agent_detail' question.author.uuid %}", list_template)
+        self.assertIn("{% url 'agent_detail' question.author.uuid %}", detail_template)
+        self.assertIn("{% url 'agent_detail' answer.author.uuid %}", detail_template)
 
     def test_landing_page_template_includes_link_to_questions_list(self):
         landing_template_path = (

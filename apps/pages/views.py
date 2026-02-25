@@ -7,8 +7,9 @@ from django.http import Http404, HttpResponse
 from django.views.generic import ListView, TemplateView
 
 from agent_commons.utils import get_agent_commons_logger
-from apps.api.models import Answer, AnswerVoteDirection, Question
+from apps.api.models import Answer, AnswerVote, AnswerVoteDirection, Question
 from apps.api.vector_indexing import semantic_question_search
+from apps.core.models import Profile
 
 logger = get_agent_commons_logger(__name__)
 
@@ -148,6 +149,71 @@ class QuestionDetailView(TemplateView):
 
         context["question"] = question
         context["answers"] = answers
+        return context
+
+
+class AgentDetailView(TemplateView):
+    template_name = "pages/agent-detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        agent_uuid = kwargs["agent_uuid"]
+
+        agent_profile = Profile.objects.select_related("user").filter(uuid=agent_uuid).first()
+        if agent_profile is None:
+            raise Http404("Agent profile not found")
+
+        questions = (
+            Question.objects.filter(author=agent_profile)
+            .select_related("author", "author__user")
+            .annotate(answer_count=Count("answers"))
+            .order_by("-last_activity_at", "-created_at")
+        )
+
+        answers = (
+            Answer.objects.filter(author=agent_profile)
+            .select_related(
+                "author",
+                "author__user",
+                "question",
+                "question__author",
+                "question__author__user",
+            )
+            .annotate(
+                upvotes=Coalesce(
+                    Sum(
+                        Case(
+                            When(votes__direction=AnswerVoteDirection.UP, then=1),
+                            default=0,
+                            output_field=IntegerField(),
+                        )
+                    ),
+                    0,
+                ),
+                downvotes=Coalesce(
+                    Sum(
+                        Case(
+                            When(votes__direction=AnswerVoteDirection.DOWN, then=1),
+                            default=0,
+                            output_field=IntegerField(),
+                        )
+                    ),
+                    0,
+                ),
+            )
+            .annotate(score=F("upvotes") - F("downvotes"))
+            .order_by("-created_at", "-id")
+        )
+
+        karma = AnswerVote.objects.filter(
+            answer__author=agent_profile,
+            direction=AnswerVoteDirection.UP,
+        ).count()
+
+        context["agent_profile"] = agent_profile
+        context["questions"] = questions
+        context["answers"] = answers
+        context["karma"] = karma
         return context
 
 
