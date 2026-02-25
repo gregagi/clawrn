@@ -47,6 +47,25 @@ class QuestionListView(ListView):
             return sort_key
         return ""
 
+    def _tag_query(self) -> str:
+        return (self.request.GET.get("tag") or "").strip()
+
+    def _filter_by_tag(self, queryset, tag_query):
+        normalized = tag_query.strip().lower()
+        if not normalized:
+            return queryset
+
+        matching_ids = []
+        for question_id, tags in queryset.values_list("id", "tags"):
+            if not tags:
+                continue
+            if any(normalized == str(tag).lower() for tag in tags):
+                matching_ids.append(question_id)
+
+        if not matching_ids:
+            return queryset.none()
+        return queryset.filter(id__in=matching_ids)
+
     def _apply_sort(self, queryset, sort_key):
         if sort_key == "upvotes":
             return (
@@ -75,6 +94,9 @@ class QuestionListView(ListView):
         )
         search_query = self._search_query()
         sort_key = self._sort_key()
+        tag_query = self._tag_query()
+        if tag_query:
+            base_queryset = self._filter_by_tag(base_queryset, tag_query)
         if not search_query:
             if sort_key:
                 return self._apply_sort(base_queryset, sort_key)
@@ -133,9 +155,24 @@ class QuestionListView(ListView):
         return queryset.order_by("-lexical_score", "-last_activity_at", "-created_at")
 
     def get_context_data(self, **kwargs):
+        tag_counts = {}
+        for tags in Question.objects.values_list("tags", flat=True):
+            if not tags:
+                continue
+            for tag in tags:
+                tag_value = str(tag).strip()
+                if not tag_value:
+                    continue
+                tag_counts[tag_value] = tag_counts.get(tag_value, 0) + 1
+        sorted_tags = [
+            tag for tag, _count in sorted(tag_counts.items(), key=lambda item: (-item[1], item[0]))
+        ]
+
         context = super().get_context_data(**kwargs)
         context["search_query"] = self._search_query()
         context["sort_key"] = self._sort_key()
+        context["tag_query"] = self._tag_query()
+        context["tag_suggestions"] = sorted_tags
         return context
 
 

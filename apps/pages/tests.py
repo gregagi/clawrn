@@ -304,6 +304,77 @@ class PagesMarkdownEndpointsTestCase(TestCase):
 
         self.assertEqual(context["sort_key"], "created")
 
+    def test_questions_list_filters_by_tag(self):
+        author_user = User.objects.create_user(
+            username="tag_author",
+            email="tag-author@example.com",
+        )
+        tagged = Question.objects.create(
+            author=author_user.profile,
+            title="Tagged question",
+            body="Body",
+            tags=["python", "django"],
+        )
+        Question.objects.create(
+            author=author_user.profile,
+            title="Other question",
+            body="Body",
+            tags=["javascript"],
+        )
+
+        request = RequestFactory().get("/questions?tag=PYTHON", HTTP_HOST="testserver")
+        view = QuestionListView()
+        view.setup(request)
+
+        ordered_ids = [question.id for question in view.get_queryset()]
+        self.assertEqual(ordered_ids, [tagged.id])
+
+    def test_questions_list_tag_suggestions_sorted_by_question_count(self):
+        author_user = User.objects.create_user(
+            username="tag_count_author", email="tag-count-author@example.com"
+        )
+        Question.objects.create(
+            author=author_user.profile,
+            title="Question one",
+            body="Body",
+            tags=["ai", "django"],
+        )
+        Question.objects.create(
+            author=author_user.profile,
+            title="Question two",
+            body="Body",
+            tags=["ai"],
+        )
+        Question.objects.create(
+            author=author_user.profile,
+            title="Question three",
+            body="Body",
+            tags=["python"],
+        )
+
+        request = RequestFactory().get("/questions", HTTP_HOST="testserver")
+        view = QuestionListView()
+        view.setup(request)
+        view.object_list = view.get_queryset()
+        context = view.get_context_data()
+
+        self.assertEqual(context["tag_suggestions"], ["ai", "django", "python"])
+
+    def test_questions_list_template_filter_section_hidden_by_default(self):
+        template_path = (
+            Path(__file__).resolve().parents[2]
+            / "frontend"
+            / "templates"
+            / "pages"
+            / "questions-list.html"
+        )
+        template = template_path.read_text(encoding="utf-8")
+
+        self.assertIn("data-filter-toggle", template)
+        self.assertIn("data-filter-panel", template)
+        self.assertIn('id="question-filters"', template)
+        self.assertIn("hidden", template)
+
     def test_questions_list_template_keeps_query_param_in_pagination_links(self):
         template_path = (
             Path(__file__).resolve().parents[2]
@@ -316,8 +387,10 @@ class PagesMarkdownEndpointsTestCase(TestCase):
 
         self.assertIn('name="q"', template)
         self.assertIn('name="sort"', template)
+        self.assertIn('name="tag"', template)
         self.assertIn("q={{ search_query|urlencode }}", template)
         self.assertIn("sort={{ sort_key }}", template)
+        self.assertIn("tag={{ tag_query|urlencode }}", template)
         self.assertIn("page={{ page_obj.previous_page_number }}", template)
         self.assertIn("page={{ page_obj.next_page_number }}", template)
 
