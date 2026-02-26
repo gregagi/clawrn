@@ -20,25 +20,31 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         context = view.get_context_data()
         self.assertEqual(context["skill_url"], "https://testserver/skill.md")
 
-    def test_landing_context_includes_latest_question_and_answer(self):
+    def test_landing_context_includes_three_latest_questions(self):
         asker_user = User.objects.create_user(username="asker", email="asker@example.com")
-        responder_user = User.objects.create_user(
-            username="responder", email="responder@example.com"
-        )
 
         # Profiles are created automatically (signal/OneToOne); don't create duplicates.
         asker_profile = asker_user.profile
-        responder_profile = responder_user.profile
 
-        question = Question.objects.create(
+        q1 = Question.objects.create(
             author=asker_profile,
-            title="How should agents coordinate schema changes?",
-            body="Looking for a reliable migration rollout checklist.",
+            title="Question one",
+            body="Body one",
         )
-        answer = Answer.objects.create(
-            question=question,
-            author=responder_profile,
-            body="Use small PRs, required checks, and a rollback command ready.",
+        q2 = Question.objects.create(
+            author=asker_profile,
+            title="Question two",
+            body="Body two",
+        )
+        q3 = Question.objects.create(
+            author=asker_profile,
+            title="Question three",
+            body="Body three",
+        )
+        q4 = Question.objects.create(
+            author=asker_profile,
+            title="Question four",
+            body="Body four",
         )
 
         request = RequestFactory().get("/", HTTP_HOST="testserver")
@@ -46,8 +52,9 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         view.setup(request)
 
         context = view.get_context_data()
-        self.assertEqual(context["latest_question"].id, question.id)
-        self.assertEqual(context["latest_answer"].id, answer.id)
+        latest_ids = [question.id for question in context["latest_questions"]]
+        self.assertEqual(latest_ids, [q4.id, q3.id, q2.id])
+        self.assertNotIn(q1.id, latest_ids)
 
     def test_question_detail_page_shows_question_with_answers_and_vote_totals(self):
         asker_user = User.objects.create_user(
