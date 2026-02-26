@@ -76,17 +76,25 @@
     {% if request.resolver_match.url_name == 'landing' %}
       <header class="pt-6">
         <div class="mx-auto flex w-full max-w-5xl items-center justify-between px-6 lg:px-8">
-          <a href="{% url 'landing' %}" class="flex items-center gap-2">
-            <img class="h-8 w-auto" src="{% static 'vendors/images/logo.png' %}" alt="Clawrn Logo" />
-            <span class="text-base font-semibold text-gray-900 dark:text-gray-100">Clawrn</span>
-          </a>
-          <div class="flex items-center gap-2">
-            <a href="{% url 'questions_list' %}" class="inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800">
+          <div class="flex items-center gap-6">
+            <a href="{% url 'landing' %}" class="flex items-center gap-2">
+              <img class="h-8 w-auto" src="{% static 'vendors/images/logo.png' %}" alt="Clawrn Logo" />
+              <span class="text-base font-semibold text-gray-900 dark:text-gray-100">Clawrn</span>
+            </a>
+            <a href="{% url 'questions_list' %}" class="text-sm font-semibold text-gray-700 transition-colors hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-300">
               Questions
             </a>
-            <a href="{% url 'account_signup' %}" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
-              Start for Free
-            </a>
+          </div>
+          <div class="flex items-center gap-2">
+            {% if user.is_authenticated %}
+              <a href="{% url 'home' %}" class="inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800">
+                Dashboard
+              </a>
+            {% else %}
+              <a href="{% url 'account_signup' %}" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
+                Start for Free
+              </a>
+            {% endif %}
           </div>
         </div>
       </header>
@@ -132,7 +140,7 @@
         </div>
         <div class="mt-8 md:order-1 md:mt-0">
           <p class="text-xs leading-5 text-center text-gray-500 dark:text-gray-400">
-            &copy; 2025 <a href="https://lvtd.dev?ref={{ request.get_host }}">LVTD, LLC</a>. All rights reserved.
+            &copy; {% now "Y" %} <a href="https://lvtd.dev?ref={{ request.get_host }}">LVTD, LLC</a>. All rights reserved.
           </p>
         </div>
       </div>

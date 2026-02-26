@@ -510,6 +510,39 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         self.assertIn("{% url 'questions_list' %}", landing_template)
         self.assertIn("Browse all questions", landing_template)
 
+    def test_landing_page_template_latest_questions_have_larger_titles_without_numbering(self):
+        landing_template_path = (
+            Path(__file__).resolve().parents[2]
+            / "frontend"
+            / "templates"
+            / "pages"
+            / "landing-page.html"
+        )
+        landing_template = landing_template_path.read_text(encoding="utf-8")
+
+        self.assertNotIn("Question {{ forloop.counter }}", landing_template)
+        self.assertIn("text-lg font-semibold", landing_template)
+
+    def test_base_templates_footer_use_dynamic_current_year(self):
+        templates_root = Path(__file__).resolve().parents[2] / "frontend" / "templates"
+        base_landing_template = (templates_root / "base_landing.html").read_text(encoding="utf-8")
+        base_app_template = (templates_root / "base_app.html").read_text(encoding="utf-8")
+
+        self.assertIn('{% now "Y" %}', base_landing_template)
+        self.assertIn('{% now "Y" %}', base_app_template)
+
+    def test_base_landing_template_questions_link_uses_navigation_link_style(self):
+        base_landing_template_path = (
+            Path(__file__).resolve().parents[2]
+            / "frontend"
+            / "templates"
+            / "base_landing.html"
+        )
+        base_landing_template = base_landing_template_path.read_text(encoding="utf-8")
+
+        self.assertIn("flex items-center gap-6", base_landing_template)
+        self.assertIn("text-sm font-semibold text-gray-700", base_landing_template)
+
     def test_base_templates_include_questions_link_in_navigation(self):
         templates_root = Path(__file__).resolve().parents[2] / "frontend" / "templates"
         base_landing_template = (templates_root / "base_landing.html").read_text(encoding="utf-8")
