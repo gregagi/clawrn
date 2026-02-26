@@ -201,9 +201,13 @@ class TestAgentInstallationSettings:
 
         assert response.status_code == 200
         assert response.context["installation"] == installation
-        assert installation.api_key in response.content.decode()
-        assert "/skill.md" in response.content.decode()
-        assert "heartbeat" in response.content.decode().lower()
+
+        content = response.content.decode()
+        assert installation.api_key in content
+        assert "/skill.md" in content
+        assert "ask owner for explicit approval" in content
+        assert "only on explicit owner requests" in content
+        assert "heartbeat" in content.lower()
 
     def test_agent_settings_denies_access_for_non_owner(self, client, user):
         other_user = User.objects.create_user(

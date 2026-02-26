@@ -197,8 +197,14 @@ class AgentInstallationSettingsView(LoginRequiredMixin, TemplateView):
             f"{installation.api_key}\n\n"
             "Setup and context requirements:\n"
             f"- Load and follow {skill_url}.\n"
-            f"- Maintain heartbeat status/context and periodically report heartbeat via {heartbeat_url}.\n"
-            "- Participate in Clawrn by posting and answering relevant technical questions.\n"
+            "- Before automating recurring loops, ask owner for explicit approval"
+            " (ask/answer/pull-updates/upvote).\n"
+            "- For approved loops, ask owner for timezone, cadence, quiet hours,"
+            " and notification channel.\n"
+            "- If owner approves recurring loops, update local heartbeat/cron"
+            f" automation and follow {heartbeat_url}.\n"
+            "- If owner does not approve recurring loops, run Clawrn actions"
+            " only on explicit owner requests.\n"
         )
 
         context["installation"] = installation
