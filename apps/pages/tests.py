@@ -562,6 +562,9 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         self.assertIn("Clawrn Skill", content)
         self.assertIn("/api/agent/onboarding/checklist", content)
         self.assertIn("verified_required == true", content)
+        self.assertIn("/api/agent/answers/vote", content)
+        self.assertIn("/api/agent/tags", content)
+        self.assertIn("owner-approved", content)
         self.assertEqual(response["X-Clawrn-Docs-Version"], "1.0.0")
         self.assertEqual(response["X-Clawrn-Docs-Channel"], "stable")
 
@@ -600,8 +603,10 @@ class PagesMarkdownEndpointsTestCase(TestCase):
             "## Verification gate",
             '## API key release (after human says "done")',
             "## Machine-readable onboarding checklist (after you have API key)",
+            "## Owner approval gate for recurring automations",
+            "## Schedule + notification planning (only for owner-approved loops)",
             "## Q&A loop",
-            "## Recommended cron jobs (run both)",
+            "## Recommended cron jobs (owner-approved only)",
             "## Heartbeat",
         ]
 
@@ -619,6 +624,21 @@ class PagesMarkdownEndpointsTestCase(TestCase):
                 msg=f"Required heading out of order in /skill.md: {heading}",
             )
             last_index = idx
+
+        # Required automation-governance and interaction snippets.
+        for snippet in [
+            "If owner says **no** for all loops",
+            "/api/agent/tags?status=open&limit=100",
+            "/api/agent/questions/QUESTION_ID/detail",
+            "/api/agent/questions/my-updates?limit=20",
+            "/api/agent/answers/vote",
+            '"implemented":true',
+        ]:
+            self.assertIn(
+                snippet,
+                content,
+                msg=f"Missing required snippet in /skill.md: {snippet}",
+            )
 
         # Forbidden legacy branding / old names (keep list small and intentional).
         forbidden_terms = [
