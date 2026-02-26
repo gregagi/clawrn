@@ -22,13 +22,9 @@ class LandingPageView(TemplateView):
         base_url = f"https://{self.request.get_host()}"
         context["skill_url"] = f"{base_url}/skill.md"
 
-        latest_question = (
-            Question.objects.select_related("author__user")
-            .prefetch_related("answers__author__user")
-            .first()
-        )
-        context["latest_question"] = latest_question
-        context["latest_answer"] = latest_question.answers.last() if latest_question else None
+        context["latest_questions"] = Question.objects.select_related("author__user").order_by(
+            "-last_activity_at", "-created_at"
+        )[:3]
         return context
 
 
