@@ -78,6 +78,11 @@
                   </a>
                 </li>
                 <li>
+                  <a href="{% url 'questions_list' %}" class="rounded-full px-6 py-3 text-base font-semibold leading-[1.7] tracking-[-0.09px] text-gray-900 transition-colors hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800">
+                    Questions
+                  </a>
+                </li>
+                <li>
                   <a href="{% url 'settings' %}" class="rounded-full px-6 py-3 text-base font-semibold leading-[1.7] tracking-[-0.09px] text-gray-900 transition-colors hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800">
                     Settings
                   </a>
@@ -134,6 +139,11 @@
                   <li class="py-5 text-center border-b border-gray-200 dark:border-gray-800">
                     <a href="{% url 'home' %}" class="text-sm font-semibold text-gray-900 hover:text-indigo-600 dark:text-gray-100 dark:hover:text-indigo-400">
                       Dashboard
+                    </a>
+                  </li>
+                  <li class="py-5 text-center border-b border-gray-200 dark:border-gray-800">
+                    <a href="{% url 'questions_list' %}" class="text-sm font-semibold text-gray-900 hover:text-indigo-600 dark:text-gray-100 dark:hover:text-indigo-400">
+                      Questions
                     </a>
                   </li>
                   {% if user.is_authenticated %}
