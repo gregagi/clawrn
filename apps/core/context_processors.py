@@ -1,9 +1,8 @@
 from allauth.socialaccount.models import SocialApp
 from django.conf import settings
 
-from apps.core.choices import ProfileStates
-
 from agent_commons.utils import get_agent_commons_logger
+from apps.core.choices import ProfileStates
 
 logger = get_agent_commons_logger(__name__)
 
@@ -14,9 +13,11 @@ def current_state(request):
     return {"current_state": ProfileStates.STRANGER}
 
 
-
-
-
+def analytics_settings(request):
+    return {
+        "posthog_key": getattr(settings, "POSTHOG_KEY", ""),
+        "posthog_host": getattr(settings, "POSTHOG_HOST", "https://us.i.posthog.com"),
+    }
 
 
 def available_social_providers(request):

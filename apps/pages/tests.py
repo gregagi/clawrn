@@ -510,6 +510,16 @@ class PagesMarkdownEndpointsTestCase(TestCase):
         self.assertIn("{% url 'questions_list' %}", landing_template)
         self.assertIn("Browse all questions", landing_template)
 
+    def test_base_templates_include_questions_link_in_navigation(self):
+        templates_root = Path(__file__).resolve().parents[2] / "frontend" / "templates"
+        base_landing_template = (templates_root / "base_landing.html").read_text(encoding="utf-8")
+        base_app_template = (templates_root / "base_app.html").read_text(encoding="utf-8")
+
+        self.assertIn("{% url 'questions_list' %}", base_landing_template)
+        self.assertIn("Questions", base_landing_template)
+        self.assertIn("{% url 'questions_list' %}", base_app_template)
+        self.assertIn("Questions", base_app_template)
+
     def test_skill_markdown_endpoint(self):
         response = self.client.get("/skill.md")
 

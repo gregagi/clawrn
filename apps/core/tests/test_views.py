@@ -1,9 +1,13 @@
+from pathlib import Path
+
 import pytest
 from allauth.account.models import EmailAddress
 from django.contrib.auth.models import User
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 
 from apps.api.models import AgentInstallation
+from apps.core.context_processors import analytics_settings
 
 
 @pytest.mark.django_db
@@ -77,6 +81,50 @@ class TestApiKeyRotation:
 
 
 @pytest.mark.django_db
+class TestLoginView:
+    def test_login_allows_username_identifier(self, client, user):
+        response = client.post(
+            reverse("account_login"),
+            {"login": user.username, "password": "password123"},
+        )
+
+        assert response.status_code == 302
+        assert response.url == reverse("home")
+        assert client.session.get("_auth_user_id") == str(user.id)
+
+    def test_login_allows_email_identifier(self, client, user):
+        response = client.post(
+            reverse("account_login"),
+            {"login": user.email, "password": "password123"},
+        )
+
+        assert response.status_code == 302
+        assert response.url == reverse("home")
+        assert client.session.get("_auth_user_id") == str(user.id)
+
+
+class TestAnalyticsScripts:
+    @override_settings(POSTHOG_KEY="phc_test_key", POSTHOG_HOST="https://eu.i.posthog.com")
+    def test_analytics_context_processor_exposes_posthog_settings(self):
+        request = RequestFactory().get("/")
+
+        context = analytics_settings(request)
+
+        assert context["posthog_key"] == "phc_test_key"
+        assert context["posthog_host"] == "https://eu.i.posthog.com"
+
+    def test_base_templates_include_posthog_snippet(self):
+        templates_root = Path(__file__).resolve().parents[3] / "frontend" / "templates"
+        base_landing_template = (templates_root / "base_landing.html").read_text(encoding="utf-8")
+        base_app_template = (templates_root / "base_app.html").read_text(encoding="utf-8")
+
+        for template in (base_landing_template, base_app_template):
+            assert "{% if posthog_key %}" in template
+            assert "posthog.init" in template
+            assert "{{ posthog_host|escapejs }}" in template
+
+
+@pytest.mark.django_db
 class TestAgentInstallationDashboard:
     def test_create_agent_installation_succeeds_when_email_verified(self, auth_client, user):
         EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
@@ -92,7 +140,11 @@ class TestAgentInstallationDashboard:
         )
 
         assert response.status_code == 200
-        installation = AgentInstallation.objects.get(profile=user.profile, agent_name="Forge", platform="openclaw")
+        installation = AgentInstallation.objects.get(
+            profile=user.profile,
+            agent_name="Forge",
+            platform="openclaw",
+        )
         assert installation.agent_version == "v1"
 
     def test_create_agent_installation_blocked_when_email_not_verified(self, auth_client, user):
@@ -107,7 +159,9 @@ class TestAgentInstallationDashboard:
         assert response.status_code == 200
         assert not AgentInstallation.objects.filter(profile=user.profile).exists()
 
-    def test_create_agent_installation_rejects_duplicate_name_platform_for_owner(self, auth_client, user):
+    def test_create_agent_installation_rejects_duplicate_name_platform_for_owner(
+        self, auth_client, user
+    ):
         EmailAddress.objects.create(user=user, email=user.email, verified=True, primary=True)
         AgentInstallation.objects.create(
             profile=user.profile,
@@ -122,7 +176,14 @@ class TestAgentInstallationDashboard:
         )
 
         assert response.status_code == 200
-        assert AgentInstallation.objects.filter(profile=user.profile, agent_name="Forge", platform="openclaw").count() == 1
+        assert (
+            AgentInstallation.objects.filter(
+                profile=user.profile,
+                agent_name="Forge",
+                platform="openclaw",
+            ).count()
+            == 1
+        )
 
 
 @pytest.mark.django_db

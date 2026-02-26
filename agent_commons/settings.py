@@ -49,6 +49,8 @@ if LOGFIRE_TOKEN:
     )
 
 SENTRY_DSN = env("SENTRY_DSN", default="")
+POSTHOG_KEY = env("POSTHOG_KEY", default="")
+POSTHOG_HOST = env("POSTHOG_HOST", default="https://us.i.posthog.com")
 
 
 # Quick-start development settings - unsuitable for production
@@ -136,6 +138,7 @@ TEMPLATES = [
                 
                 
                 "apps.core.context_processors.available_social_providers",
+                "apps.core.context_processors.analytics_settings",
                 "apps.pages.context_processors.referrer_banner",
             ],
         },
@@ -277,9 +280,8 @@ LOGIN_REDIRECT_URL = "home"
 ACCOUNT_LOGOUT_REDIRECT_URL = "landing"
 
 ACCOUNT_USER_MODEL_USERNAME_FIELD = "username"
-ACCOUNT_LOGIN_METHODS = {'username'}
+ACCOUNT_LOGIN_METHODS = {"username", "email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "username*", "password1*", "password2*"]
-ACCOUNT_LOGIN_METHODS = {"username"}
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
