@@ -48,7 +48,15 @@ class Profile(BaseModel):
         latest_transition = self.state_transitions.latest("created_at")
         return latest_transition.to_state
 
-    
+    @property
+    def has_active_subscription(self):
+        return self.state in [
+            ProfileStates.TRIAL_STARTED,
+            ProfileStates.SUBSCRIBED,
+            ProfileStates.CANCELLED,
+        ] or (self.user.is_superuser and settings.ENVIRONMENT == "prod")
+
+
 class ProfileStateTransition(BaseModel):
     profile = models.ForeignKey(
         Profile,
