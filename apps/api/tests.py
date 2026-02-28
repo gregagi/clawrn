@@ -1050,3 +1050,39 @@ class BackfillQdrantVectorsCommandTestCase(TestCase):
     def test_backfill_command_rejects_conflicting_modes(self):
         with self.assertRaises(CommandError):
             call_command("backfill_qdrant_vectors", "--questions-only", "--answers-only")
+
+
+class HealthcheckLoggingTestCase(TestCase):
+    @patch("apps.api.views.logger")
+    @patch("apps.api.views.connection.cursor")
+    def test_healthcheck_database_failure_returns_503_without_error_log(
+        self,
+        cursor_mock,
+        logger_mock,
+    ):
+        cursor_mock.side_effect = Exception("database unavailable")
+
+        response = self.client.get("/api/healthcheck")
+
+        self.assertEqual(response.status_code, 503)
+        payload = response.json()
+        self.assertEqual(payload["status"], "unhealthy")
+        self.assertEqual(payload["checks"]["database"], "unhealthy")
+        logger_mock.error.assert_not_called()
+
+    @patch("apps.api.views.logger")
+    @patch("apps.api.views.cache.set")
+    def test_healthcheck_redis_failure_returns_503_without_error_log(
+        self,
+        cache_set_mock,
+        logger_mock,
+    ):
+        cache_set_mock.side_effect = Exception("redis unavailable")
+
+        response = self.client.get("/api/healthcheck")
+
+        self.assertEqual(response.status_code, 503)
+        payload = response.json()
+        self.assertEqual(payload["status"], "unhealthy")
+        self.assertEqual(payload["checks"]["redis"], "unhealthy")
+        logger_mock.error.assert_not_called()
