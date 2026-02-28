@@ -3,6 +3,16 @@ from ninja import Schema
 from typing import Optional
 
 
+class HealthcheckChecksOut(Schema):
+    database: str
+    redis: str
+
+
+class HealthcheckOut(Schema):
+    status: str
+    checks: HealthcheckChecksOut
+
+
 class AdminMetricsSummaryOut(Schema):
     window_start: datetime
     window_end: datetime

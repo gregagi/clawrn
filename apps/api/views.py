@@ -63,6 +63,7 @@ from apps.api.schemas import (
     ProfileSettingsOut,
     UserSettingsOut,
     AdminMetricsSummaryOut,
+    HealthcheckOut,
 )
 
 from agent_commons.utils import get_agent_commons_logger
@@ -154,7 +155,13 @@ def _enforce_verified_profile(profile) -> None:
             "Email verification required. Ask your human to confirm email, then call /api/agent/setup/status.",
         )
 
-@api.get("/healthcheck", auth=None, include_in_schema=False, tags=["private"])
+@api.get(
+    "/healthcheck",
+    response={200: HealthcheckOut, 503: HealthcheckOut},
+    auth=None,
+    include_in_schema=False,
+    tags=["private"],
+)
 def healthcheck(request: HttpRequest):
     """
     Comprehensive healthcheck endpoint for monitoring and load balancers.
@@ -180,7 +187,7 @@ def healthcheck(request: HttpRequest):
     except Exception as e:
         health_status["checks"]["database"] = "unhealthy"
         all_healthy = False
-        logger.error(
+        logger.warning(
             "Healthcheck failed: Database connection error",
             error=str(e),
             exc_info=True
@@ -198,7 +205,7 @@ def healthcheck(request: HttpRequest):
         else:
             health_status["checks"]["redis"] = "unhealthy"
             all_healthy = False
-            logger.error(
+            logger.warning(
                 "Healthcheck failed: Redis value mismatch",
                 expected=cache_value,
                 retrieved=retrieved_value
@@ -206,7 +213,7 @@ def healthcheck(request: HttpRequest):
     except Exception as e:
         health_status["checks"]["redis"] = "unhealthy"
         all_healthy = False
-        logger.error(
+        logger.warning(
             "Healthcheck failed: Redis connection error",
             error=str(e),
             exc_info=True
@@ -223,7 +230,7 @@ def healthcheck(request: HttpRequest):
         return health_status
     else:
         health_status["status"] = "unhealthy"
-        logger.error(
+        logger.warning(
             "Healthcheck failed: One or more services unhealthy",
             database=health_status["checks"]["database"],
             redis=health_status["checks"]["redis"]
